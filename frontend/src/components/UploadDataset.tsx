@@ -91,7 +91,6 @@ export const UploadDataset = () => {
           rounded="lg"
           shadow="md"
           onClick={handleUploadClick}
-          loading={isLoading}
         >
           上传数据集开始优化
         </Button>

@@ -1,4 +1,4 @@
-import { Box, Badge, Text } from '@chakra-ui/react'
+import { Box, Badge, Text, Flex, useBreakpointValue } from '@chakra-ui/react'
 
 interface TestCaseResult {
   id: string
@@ -29,6 +29,9 @@ interface TestCaseResult {
 
 // 简化版表格实现
 export function TestCaseTable() {
+  // 使用响应式断点判断是否是小屏幕
+  const isSmallScreen = useBreakpointValue({ base: true, lg: false }) || false;
+  
   // 这里应该从状态管理库获取测试用例结果，暂时使用静态数据
   const testCases: TestCaseResult[] = [
     {
@@ -112,36 +115,60 @@ export function TestCaseTable() {
   ]
 
   const renderScoreBadge = (score: number) => {
-    const textColor = score === 4 ? "green.800" : 
-                    score === 3 ? "orange.800" :
-                    score === 2 ? "red.800" :
-                    "white"
+    let textColor = "white";
+    let bgColor = "gray.500";
+    let label = "";
     
-    const bgColor = score === 5 ? "green.500" :
-                  score === 4 ? "green.200" :
-                  score === 3 ? "orange.200" :
-                  score === 2 ? "red.200" :
-                  "red.500"
+    switch(score) {
+      case 5:
+        bgColor = "green.500";
+        label = "优秀";
+        break;
+      case 4:
+        bgColor = "green.400";
+        textColor = "white";
+        label = "遗漏次要信息";
+        break;
+      case 3:
+        bgColor = "orange.400";
+        textColor = "white";
+        label = "遗漏关键信息";
+        break;
+      case 2:
+        bgColor = "red.400";
+        textColor = "white";
+        label = "信息严重不足";
+        break;
+      case 1:
+        bgColor = "red.500";
+        label = "完全不符合要求";
+        break;
+    }
     
     return (
-      <Badge 
-        px={2} 
-        py={1} 
-        borderRadius="md" 
-        fontSize="xs" 
-        fontWeight="bold"
-        color={textColor}
-        bg={bgColor}
-      >
-        {score}
-      </Badge>
+      <Flex alignItems="center">
+        <Badge 
+          px={2} 
+          py={1} 
+          borderRadius="md" 
+          fontSize="xs" 
+          fontWeight="bold"
+          color={textColor}
+          bg={bgColor}
+        >
+          {score}
+        </Badge>
+        <Text as="span" fontSize="xs" fontStyle="italic" color="gray.500" ml={2}>
+          {label}
+        </Text>
+      </Flex>
     )
   }
 
   // 自定义表格实现，不使用Chakra UI的Table组件
   return (
-    <Box overflowX="auto">
-      <Box>
+    <Box overflowX="auto" width="100%">
+      <Box minWidth={isSmallScreen ? "800px" : "auto"} width="100%">
         {/* 表头行 */}
         <Box 
           display="flex" 
@@ -156,13 +183,13 @@ export function TestCaseTable() {
           color="gray.500"
           textTransform="uppercase"
         >
-          <Box px={4} py={3} width="60px">序号</Box>
-          <Box px={4} py={3} width="200px">输入 (片段)</Box>
-          <Box px={4} py={3} width="200px">期望输出/指南</Box>
-          <Box px={4} py={3} minWidth="200px">初始提示词结果</Box>
-          <Box px={4} py={3} minWidth="200px">迭代 1 结果</Box>
-          <Box px={4} py={3} minWidth="200px">迭代 2 结果</Box>
-          <Box px={4} py={3} minWidth="200px">迭代 3 结果 (最终)</Box>
+          <Box flex="0 0 40px" px={2} py={3}>序号</Box>
+          <Box flex="1" minWidth="100px" px={2} py={3}>输入 (片段)</Box>
+          <Box flex="1" minWidth="100px" px={2} py={3}>期望输出/指南</Box>
+          <Box flex="1" minWidth="100px" px={2} py={3}>初始提示词结果</Box>
+          <Box flex="1" minWidth="100px" px={2} py={3}>迭代 1 结果</Box>
+          <Box flex="1" minWidth="100px" px={2} py={3}>迭代 2 结果</Box>
+          <Box flex="1" minWidth="100px" px={2} py={3}>迭代 3 结果</Box>
         </Box>
 
         {/* 数据行 */}
@@ -173,74 +200,62 @@ export function TestCaseTable() {
             borderBottomWidth="1px"
             borderColor="gray.200"
           >
-            <Box px={4} py={3} width="60px">{testCase.index}</Box>
+            <Box flex="0 0 40px" px={2} py={3}>{testCase.index}</Box>
             
-            <Box px={4} py={3} width="200px">
+            <Box flex="1" minWidth="100px" px={2} py={3}>
               <Text fontSize="sm" title={testCase.input} overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
                 {testCase.input}
               </Text>
             </Box>
             
-            <Box px={4} py={3} width="200px">
+            <Box flex="1" minWidth="100px" px={2} py={3}>
               <Text fontSize="sm" title={testCase.expectedOutput} overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
                 {testCase.expectedOutput}
               </Text>
             </Box>
 
             {/* 初始结果 */}
-            <Box px={4} py={3} minWidth="200px">
+            <Box flex="1" minWidth="100px" px={2} py={3}>
               <Text fontSize="sm" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" title={testCase.initialResult.output}>
                 {testCase.initialResult.output}
               </Text>
               <Box mt={1}>
                 {renderScoreBadge(testCase.initialResult.score)}
-                <Text as="span" fontSize="xs" fontStyle="italic" color="gray.500" ml={1}>
-                  {testCase.initialResult.comment}
-                </Text>
               </Box>
             </Box>
 
             {/* 迭代1结果 */}
             {testCase.iteration1Result && (
-              <Box px={4} py={3} minWidth="200px">
+              <Box flex="1" minWidth="100px" px={2} py={3}>
                 <Text fontSize="sm" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" title={testCase.iteration1Result.output}>
                   {testCase.iteration1Result.output}
                 </Text>
                 <Box mt={1}>
                   {renderScoreBadge(testCase.iteration1Result.score)}
-                  <Text as="span" fontSize="xs" fontStyle="italic" color="gray.500" ml={1}>
-                    {testCase.iteration1Result.comment}
-                  </Text>
                 </Box>
               </Box>
             )}
 
             {/* 迭代2结果 */}
             {testCase.iteration2Result && (
-              <Box px={4} py={3} minWidth="200px">
+              <Box flex="1" minWidth="100px" px={2} py={3}>
                 <Text fontSize="sm" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" title={testCase.iteration2Result.output}>
                   {testCase.iteration2Result.output}
                 </Text>
                 <Box mt={1}>
                   {renderScoreBadge(testCase.iteration2Result.score)}
-                  <Text as="span" fontSize="xs" fontStyle="italic" color="gray.500" ml={1}>
-                    {testCase.iteration2Result.comment}
-                  </Text>
                 </Box>
               </Box>
             )}
 
             {/* 迭代3结果 */}
             {testCase.iteration3Result && (
-              <Box px={4} py={3} minWidth="200px">
+              <Box flex="1" minWidth="100px" px={2} py={3}>
                 <Text fontSize="sm" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" title={testCase.iteration3Result.output}>
                   {testCase.iteration3Result.output}
                 </Text>
                 <Box mt={1}>
                   {renderScoreBadge(testCase.iteration3Result.score)}
-                  <Text as="span" fontSize="xs" fontStyle="italic" color="gray.500" ml={1}>
-                    {testCase.iteration3Result.comment}
-                  </Text>
                 </Box>
               </Box>
             )}

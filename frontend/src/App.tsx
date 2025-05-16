@@ -1,10 +1,15 @@
-import { Flex } from '@chakra-ui/react'
+import { Flex, Box } from '@chakra-ui/react'
 import { Sidebar } from '@/components/Sidebar'
 import { MainContent } from './components/MainContent'
 
 function App() {
+  
   return (
-    <Flex h="100vh">
+    <Flex 
+      h="100vh" 
+      w="100vw"
+      flexDirection="row"
+    >
       <Sidebar />
       <MainContent />
     </Flex>

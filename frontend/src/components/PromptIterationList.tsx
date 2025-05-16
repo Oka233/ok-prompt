@@ -2,10 +2,12 @@ import {
   Box, 
   Heading, 
   Text,
-  Button
+  Button,
+  Flex
 } from '@chakra-ui/react'
 import { ChevronDownIcon } from '@chakra-ui/icons'
 import { useState } from 'react'
+import { BiChevronDown } from 'react-icons/bi'
 
 interface PromptIteration {
   id: string
@@ -79,42 +81,53 @@ export function PromptIterationList() {
           <Box 
             key={item.id}
             borderWidth="1px"
-            borderColor={item.isSelected ? "indigo.500" : "gray.200"}
+            borderColor={item.isSelected ? "blue.500" : "gray.200"}
             borderRadius="lg"
-            p={3}
-            bg={item.isSelected ? "indigo.50" : "white"}
+            p={4}
+            bg={item.isSelected ? "blue.50" : "white"}
             mb={3}
             cursor="pointer"
             _hover={{ shadow: "md" }}
             transition="150ms ease-in-out"
           >
-            <Text fontWeight="semibold" color={item.isSelected ? "indigo.700" : "gray.700"}>
+            <Text fontWeight="semibold" color={item.isSelected ? "blue.700" : "gray.700"}>
               {item.isInitial ? "初始提示词" : `优化提示词`} (Iteration {item.iteration})
             </Text>
-            <Text fontSize="sm" color="gray.600" mt={1}>
+            <Text fontSize="sm" color="gray.600" mt={2} mb={2}>
               "{item.prompt}"
             </Text>
             
             <Box mt={2}>
               <Button 
+                variant="ghost"
                 fontSize="xs" 
                 color="gray.500" 
                 cursor="pointer" 
                 _hover={{ color: "gray.700" }}
                 display="flex"
                 alignItems="center"
-                p={0}
                 height="auto"
+                padding={0}
                 onClick={() => toggleReport(item.id)}
               >
-                查看评估总结报告
-                {/* <ChevronDownIcon 
-                  transform={openReport === item.id ? "rotate(180deg)" : undefined}
-                  transition="transform 0.2s"
-                  ml={1}
-                /> */}
+                <Flex alignItems="center">
+                  查看评估总结报告
+                  <BiChevronDown 
+                    size={16}
+                    style={{
+                      transform: openReport === item.id ? 'rotate(180deg)' : undefined,
+                      transition: 'transform 0.2s',
+                      marginLeft: '4px'
+                    }}
+                  />
+                </Flex>
               </Button>
               
+              {openReport === item.id && (
+                <Box mt={2} p={2} bg="gray.50" borderRadius="md" fontSize="xs" color="gray.600">
+                  {item.reportSummary}
+                </Box>
+              )}
             </Box>
           </Box>
         ))}

@@ -5,9 +5,11 @@ import {
   Heading,
   VStack,
   Link,
+  Flex,
+  useBreakpointValue
 } from '@chakra-ui/react';
 import { useOptimizationStore } from '@/store/useOptimizationStore';
-import { AddIcon } from '@chakra-ui/icons';
+import { FiPlus } from 'react-icons/fi';
 import { OptimizationTask } from '@/types/optimization';
 
 interface OptimizationHistoryItem {
@@ -23,6 +25,13 @@ interface OptimizationHistoryItem {
 
 export function Sidebar() {
   const { } = useOptimizationStore();
+  
+  // 使用响应式宽度 - 在大屏幕上也使用固定宽度，保持侧边栏大小合适
+  const sidebarWidth = useBreakpointValue({ 
+    base: 'full', 
+    md: '280px',
+    xl: '300px'
+  }) || '280px';
   
   // 这里应该从状态管理库获取历史记录，暂时使用静态数据
   const historyItems: OptimizationHistoryItem[] = [
@@ -57,47 +66,53 @@ export function Sidebar() {
 
   return (
     <Box 
-      w="64" 
-      bg="gray.800" 
+      w={sidebarWidth} 
+      minWidth={sidebarWidth}
+      maxWidth={sidebarWidth}
+      flexShrink={0} // 防止flex布局下被压缩
+      flexGrow={0} // 防止flex布局下被拉伸
+      bg="gray.900" 
       color="white" 
       p={4} 
       display="flex" 
       flexDirection="column"
+      h="100vh"
     >
       <Heading size="md" mb={4}>优化历史</Heading>
       
       <Button 
         colorScheme="purple" 
-        mb={4}
+        mb={6}
         onClick={handleNewOptimization}
       >
-        <Box mr={2} display="inline-block">
-        </Box>
-        + 发起新优化
+        <Flex alignItems="center" gap={2}>
+          <FiPlus />
+          <Text>发起新优化</Text>
+        </Flex>
       </Button>
       
       <Box flex="1" overflowY="auto">
-        <VStack align="stretch">
+        <VStack align="stretch" gap={3}>
           {historyItems.map(item => (
-            <Link
+            <Box
               key={item.id}
-              py={2.5}
+              py={3}
               px={4}
               borderRadius="lg"
               bg={item.isSelected ? 'gray.700' : 'transparent'}
-              _hover={{ bg: item.isSelected ? 'gray.700' : 'gray.600' }}
+              _hover={{ bg: item.isSelected ? 'gray.700' : 'gray.800' }}
               transition="150ms ease-in-out"
-              display="block"
+              cursor="pointer"
             >
               <Heading size="sm" fontWeight="semibold">{item.name}</Heading>
-              <Text fontSize="xs" color="gray.400">数据集: {item.dataset}</Text>
-              <Text fontSize="xs" color="gray.400">状态: {item.status}</Text>
-            </Link>
+              <Text fontSize="xs" color="gray.400" mt={1}>数据集: {item.dataset}</Text>
+              <Text fontSize="xs" color="gray.400" mt={0.5}>状态: {item.status}</Text>
+            </Box>
           ))}
         </VStack>
       </Box>
       
-      <Box mt="auto">
+      <Box mt="auto" pt={4} borderTop="1px solid" borderColor="gray.700">
         <Text fontSize="xs" color="gray.500">用户: example@email.com</Text>
       </Box>
     </Box>

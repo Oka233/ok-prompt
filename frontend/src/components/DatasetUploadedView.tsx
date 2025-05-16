@@ -1,4 +1,4 @@
-import { Box, Flex, Heading } from '@chakra-ui/react'
+import { Box, Flex, Heading, useBreakpointValue } from '@chakra-ui/react'
 import { OptimizationHeader } from '@/components/OptimizationHeader'
 import { PromptIterationList } from './PromptIterationList'
 import { TestCaseTable } from '@/components/TestCaseTable'
@@ -14,8 +14,11 @@ export function DatasetUploadedView() {
     iterationCount: 3
   }
 
+  // 使用响应式布局
+  const direction = useBreakpointValue({ base: 'column', lg: 'row' }) || 'column';
+
   return (
-    <Box>
+    <Box width="100%">
       <OptimizationHeader 
         taskName={currentTask.name}
         datasetName={currentTask.datasetName}
@@ -24,14 +27,33 @@ export function DatasetUploadedView() {
         iterationCount={currentTask.iterationCount}
       />
 
-      <Flex flexDirection={{ base: "column", lg: "row" }} gap={6} mt={6}>
-        <Box width={{ base: "100%", lg: "1/3" }} bg="white" shadow="sm" borderRadius="lg" p={4} 
-          overflow="auto" maxHeight={{ base: "auto", lg: "calc(100vh - 12rem)" }}>
+      <Flex 
+        flexDirection={direction}
+        gap={6} 
+        mt={6}
+        width="100%"
+      >
+        <Box 
+          width={direction === 'row' ? '50%' : '100%'} 
+          bg="white" 
+          shadow="sm" 
+          borderRadius="lg" 
+          p={4} 
+          overflow="auto" 
+          maxHeight={{ base: '500px', lg: 'calc(100vh - 12rem)' }}
+        >
           <PromptIterationList />
         </Box>
 
-        <Box width={{ base: "100%", lg: "2/3" }} bg="white" shadow="sm" borderRadius="lg" p={1}
-          overflow="auto" maxHeight={{ base: "auto", lg: "calc(100vh - 12rem)" }}>
+        <Box 
+          width={direction === 'row' ? '50%' : '100%'} 
+          bg="white" 
+          shadow="sm" 
+          borderRadius="lg" 
+          p={1}
+          overflow="auto" 
+          maxHeight={{ base: '500px', lg: 'calc(100vh - 12rem)' }}
+        >
           <Box p={3}>
             <Heading as="h3" size="md" fontWeight="semibold" color="gray.700" mb={3}>
               测试用例评估详情

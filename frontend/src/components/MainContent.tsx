@@ -10,14 +10,20 @@ export function MainContent() {
   return (
     <Box 
       flex="1" 
-      p={6} 
-      overflowY="auto"
+      p={{ base: 4, md: 6 }}
+      overflow="hidden"
+      display="flex"
+      flexDirection="column"
+      width="0"
+      height="100%"
     >
-      {hasDataset ? (
-        <DatasetUploadedView />
-      ) : (
-        <NoDatasetView onUpload={() => setHasDataset(true)} />
-      )}
+      <Box flexGrow={1} overflow="auto">
+        {hasDataset ? (
+          <DatasetUploadedView />
+        ) : (
+          <NoDatasetView onUpload={() => setHasDataset(true)} />
+        )}
+      </Box>
     </Box>
   )
 } 
