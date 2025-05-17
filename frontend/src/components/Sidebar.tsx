@@ -21,7 +21,7 @@ export function Sidebar() {
   
   // 使用响应式宽度 - 在大屏幕上也使用固定宽度，保持侧边栏大小合适
   const sidebarWidth = useBreakpointValue({ 
-    base: 'full', 
+    base: '280px', 
     md: '280px',
     xl: '300px'
   }) || '280px';

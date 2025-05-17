@@ -16,6 +16,7 @@ function App() {
     <Flex 
       h="100vh" 
       w="100vw"
+      minW="720px"
       flexDirection="row"
     >
       <Sidebar />

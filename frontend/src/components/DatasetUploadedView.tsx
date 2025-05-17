@@ -18,7 +18,7 @@ export function DatasetUploadedView() {
   }
 
   return (
-    <Box width="100%">
+    <Flex flexDirection="column" width="100%" height="100%">
       <OptimizationHeader 
         taskName={currentTask.name}
         datasetName={currentTask.datasetName}
@@ -29,9 +29,10 @@ export function DatasetUploadedView() {
 
       <Flex 
         flexDirection={direction}
-        gap={6} 
-        mt={6}
+        gap={6}
         width="100%"
+        flexGrow={1}
+        height="0"
       >
         <Box 
           width={direction === 'row' ? '50%' : '100%'} 
@@ -41,8 +42,8 @@ export function DatasetUploadedView() {
           borderWidth="1px"
           borderColor="gray.200"
           p={4} 
-          overflow="auto" 
-          maxHeight={{ base: '500px', lg: 'calc(100vh - 12rem)' }}
+          overflow="auto"
+          height={direction === 'column' ? '100%' : 'auto'}
         >
           <PromptIterationList />
         </Box>
@@ -55,8 +56,8 @@ export function DatasetUploadedView() {
           borderWidth="1px"
           borderColor="gray.200"
           p={1}
-          overflow="auto" 
-          maxHeight={{ base: '500px', lg: 'calc(100vh - 12rem)' }}
+          overflow="auto"
+          height={direction === 'column' ? '100%' : 'auto'}
         >
           <Box p={3}>
             <Heading as="h3" size="md" fontWeight="semibold" color="gray.700" mb={3}>
@@ -66,7 +67,7 @@ export function DatasetUploadedView() {
           <TestCaseTable />
         </Box>
       </Flex>
-    </Box>
+    </Flex>
   )
 }
 
