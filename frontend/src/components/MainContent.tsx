@@ -1,11 +1,10 @@
-import { useState } from 'react'
 import { Box } from '@chakra-ui/react'
 import { NoDatasetView } from '@/components/NoDatasetView'
 import { DatasetUploadedView } from '@/components/DatasetUploadedView'
+import { useOptimizationStore } from '@/store/useOptimizationStore'
 
 export function MainContent() {
-  // 这里使用状态管理库来决定显示哪个视图，暂时用本地状态
-  const [hasDataset, setHasDataset] = useState(true)
+  const { viewState, setViewState } = useOptimizationStore()
   
   return (
     <Box 
@@ -18,10 +17,10 @@ export function MainContent() {
       height="100%"
     >
       <Box flexGrow={1} overflow="auto">
-        {hasDataset ? (
+        {viewState === 'task_view' ? (
           <DatasetUploadedView />
         ) : (
-          <NoDatasetView onUpload={() => setHasDataset(true)} />
+          <NoDatasetView onUpload={() => setViewState('task_view')} />
         )}
       </Box>
     </Box>

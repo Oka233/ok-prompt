@@ -22,7 +22,9 @@ export function OptimizationHeader({
     <Box 
       bg="white" 
       shadow="sm" 
-      borderRadius="lg" 
+      borderRadius="lg"
+      borderWidth="1px"
+      borderColor="gray.200"
       p={{ base: 4, md: 5 }} 
       mb={{ base: 4, md: 6 }}
       width="100%"

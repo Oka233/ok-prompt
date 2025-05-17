@@ -4,7 +4,6 @@ import {
   Text,
   Heading,
   VStack,
-  Link,
   Flex,
   useBreakpointValue
 } from '@chakra-ui/react';
@@ -12,19 +11,13 @@ import { useOptimizationStore } from '@/store/useOptimizationStore';
 import { FiPlus } from 'react-icons/fi';
 import { OptimizationTask } from '@/types/optimization';
 
-interface OptimizationHistoryItem {
-  id: string;
-  name: string;
-  dataset: string;
-  status: string;
-  date: string;
-  score?: string;
-  iteration?: string;
-  isSelected?: boolean;
-}
-
 export function Sidebar() {
-  const { } = useOptimizationStore();
+  const { 
+    tasks, 
+    currentTaskId, 
+    selectTask, 
+    setViewState 
+  } = useOptimizationStore();
   
   // 使用响应式宽度 - 在大屏幕上也使用固定宽度，保持侧边栏大小合适
   const sidebarWidth = useBreakpointValue({ 
@@ -32,36 +25,35 @@ export function Sidebar() {
     md: '280px',
     xl: '300px'
   }) || '280px';
-  
-  // 这里应该从状态管理库获取历史记录，暂时使用静态数据
-  const historyItems: OptimizationHistoryItem[] = [
-    {
-      id: '1',
-      name: '优化任务 2024-05-15',
-      dataset: 'product_desc.json',
-      status: '已完成 (5/5 满分)',
-      date: '2024-05-15',
-      isSelected: true
-    },
-    {
-      id: '2',
-      name: '优化任务 2024-05-12',
-      dataset: 'email_subject.json',
-      status: '进行中 (迭代 3/10)',
-      date: '2024-05-12'
-    },
-    {
-      id: '3',
-      name: '优化任务 2024-05-10',
-      dataset: 'name_extraction.json',
-      status: '已达最大迭代',
-      date: '2024-05-10'
-    }
-  ];
 
+  // 处理任务选择
+  const handleTaskSelect = (taskId: string) => {
+    console.log(`点击侧边栏任务: ${taskId}`);
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      console.log(`任务名称: ${task.name}, 数据集: ${task.datasetName}, 状态: ${task.status}`);
+    }
+    selectTask(taskId);
+  };
+
+  // 处理新建优化任务
   const handleNewOptimization = () => {
-    // 处理新建优化的逻辑
-    console.log('新建优化任务');
+    console.log('点击发起新优化按钮');
+    setViewState('upload');
+  };
+
+  // 获取任务状态显示文本
+  const getTaskStatusText = (task: OptimizationTask) => {
+    switch (task.status) {
+      case 'completed':
+        return `已完成 (全部测试用例满分)`;
+      case 'in_progress':
+        return `进行中 (迭代 ${task.iterationCount}/${task.maxIterations})`;
+      case 'max_iterations_reached':
+        return '已达最大迭代';
+      default:
+        return '未开始';
+    }
   };
 
   return (
@@ -80,8 +72,11 @@ export function Sidebar() {
     >
       <Heading size="md" mb={4}>优化历史</Heading>
       
-      <Button 
-        colorScheme="purple" 
+      <Button
+        bg="gray.700"
+        borderRadius="lg"
+        _hover={{ bg: 'gray.800' }}
+        transition="150ms ease-in-out"
         mb={6}
         onClick={handleNewOptimization}
       >
@@ -93,20 +88,21 @@ export function Sidebar() {
       
       <Box flex="1" overflowY="auto">
         <VStack align="stretch" gap={3}>
-          {historyItems.map(item => (
+          {tasks.map(task => (
             <Box
-              key={item.id}
+              key={task.id}
               py={3}
               px={4}
               borderRadius="lg"
-              bg={item.isSelected ? 'gray.700' : 'transparent'}
-              _hover={{ bg: item.isSelected ? 'gray.700' : 'gray.800' }}
+              bg={task.id === currentTaskId ? 'gray.700' : 'transparent'}
+              _hover={{ bg: task.id === currentTaskId ? 'gray.700' : 'gray.800' }}
               transition="150ms ease-in-out"
               cursor="pointer"
+              onClick={() => handleTaskSelect(task.id)}
             >
-              <Heading size="sm" fontWeight="semibold">{item.name}</Heading>
-              <Text fontSize="xs" color="gray.400" mt={1}>数据集: {item.dataset}</Text>
-              <Text fontSize="xs" color="gray.400" mt={0.5}>状态: {item.status}</Text>
+              <Heading size="sm" fontWeight="semibold">{task.name}</Heading>
+              <Text fontSize="xs" color="gray.400" mt={1}>数据集: {task.datasetName}</Text>
+              <Text fontSize="xs" color="gray.400" mt={0.5}>状态: {getTaskStatusText(task)}</Text>
             </Box>
           ))}
         </VStack>
