@@ -8,7 +8,7 @@ import {
   useBreakpointValue
 } from '@chakra-ui/react';
 import { useOptimizationStore } from '@/store/useOptimizationStore';
-import { FiPlus } from 'react-icons/fi';
+import { FiPlus, FiSettings } from 'react-icons/fi';
 import { OptimizationTask } from '@/types/optimization';
 
 export function Sidebar() {
@@ -41,6 +41,12 @@ export function Sidebar() {
     console.log('点击发起新优化按钮');
     setViewState('upload');
   };
+  
+  // 处理进入模型管理
+  const handleModelManagement = () => {
+    console.log('点击模型管理按钮');
+    setViewState('model_management');
+  };
 
   // 获取任务状态显示文本
   const getTaskStatusText = (task: OptimizationTask) => {
@@ -70,7 +76,7 @@ export function Sidebar() {
       flexDirection="column"
       h="100vh"
     >
-      <Heading size="md" mb={4}>优化历史</Heading>
+      <Heading size="md" mb={4}>OKPrompt</Heading>
       
       <Button
         bg="gray.700"
@@ -82,7 +88,7 @@ export function Sidebar() {
       >
         <Flex alignItems="center" gap={2}>
           <FiPlus />
-          <Text>发起新优化</Text>
+          <Text>创建优化任务</Text>
         </Flex>
       </Button>
       
@@ -109,7 +115,20 @@ export function Sidebar() {
       </Box>
       
       <Box mt="auto" pt={4} borderTop="1px solid" borderColor="gray.700">
-        <Text fontSize="xs" color="gray.500">用户: example@email.com</Text>
+        <Button
+          width="100%"
+          bg="gray.800"
+          borderRadius="lg"
+          _hover={{ bg: 'gray.700' }}
+          transition="150ms ease-in-out"
+          mb={4}
+          onClick={handleModelManagement}
+        >
+          <Flex alignItems="center" gap={2}>
+            <FiSettings />
+            <Text>模型管理</Text>
+          </Flex>
+        </Button>
       </Box>
     </Box>
   );

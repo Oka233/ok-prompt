@@ -20,6 +20,7 @@ export function DatasetUploadedView() {
   return (
     <Flex flexDirection="column" width="100%" height="100%">
       <OptimizationHeader 
+        taskId={currentTask.id}
         taskName={currentTask.name}
         datasetName={currentTask.datasetName}
         mode={currentTask.testSet.mode}
