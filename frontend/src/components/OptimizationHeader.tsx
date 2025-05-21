@@ -14,7 +14,7 @@ import {
   VStack,
   useDisclosure
 } from '@chakra-ui/react'
-import { FiTrash2, FiSettings, FiSave, FiXCircle } from 'react-icons/fi'
+import { FiTrash2, FiSettings, FiSave, FiXCircle, FiPlay } from 'react-icons/fi'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 import { useState, useEffect } from 'react'
 
@@ -43,7 +43,7 @@ export function OptimizationHeader({
 }: OptimizationHeaderProps) {
   const direction = useBreakpointValue({ base: 'column', md: 'row' }) || 'column';
   const isMobile = direction === 'column';
-  const { deleteTask, models, tasks, updateTaskModels } = useOptimizationStore();
+  const { deleteTask, models, tasks, updateTaskModels, startOptimization } = useOptimizationStore();
   const { open, onOpen, onClose } = useDisclosure();
 
   const currentTask = tasks.find(t => t.id === taskId);
@@ -77,6 +77,12 @@ export function OptimizationHeader({
     setSelectedTargetModel(currentTask?.targetModelId);
     setSelectedOptimizationModel(currentTask?.optimizationModelId);
     onClose();
+  };
+
+  const handleStartOptimization = async () => {
+    if (taskId) {
+      await startOptimization(taskId);
+    }
   };
   
   return (
@@ -114,25 +120,33 @@ export function OptimizationHeader({
             <Badge colorScheme={status === 'completed' || status === 'max_iterations_reached' ? 'blue' : (status === 'in_progress' ? 'green' : 'gray')} px={2} py={1} borderRadius="md">
               {status}
             </Badge>
+            <Button
+              colorScheme="green"
+              size="sm"
+              variant="outline"
+              onClick={handleStartOptimization}
+              disabled={status === 'in_progress' || status === 'completed'}
+            >
+              <Flex align="center" gap={2}>
+                <FiPlay />
+                <Text>开始优化</Text>
+              </Flex>
+            </Button>
             <IconButton
               aria-label="高级设置"
               size="sm"
-              variant="ghost"
+              variant="outline"
               onClick={onOpen}
             >
               <FiSettings />
             </IconButton>
             <Button
               colorScheme="red"
-              variant="ghost"
+              variant="outline"
               size="sm"
-              ml={3}
               onClick={handleDelete}
             >
-              <Flex align="center" gap={2}>
-                <FiTrash2 />
-                <Text>删除任务</Text>
-              </Flex>
+              <FiTrash2 />
             </Button>
           </Flex>
           <Text fontSize="sm" color="gray.500" mt={1}>
@@ -249,4 +263,4 @@ export function OptimizationHeader({
       )}
     </Box>
   )
-} 
+}
