@@ -8,9 +8,9 @@ function App() {
   const { initializeDemoData } = useOptimizationStore()
   
   // 初始化演示数据
-  useEffect(() => {
-    initializeDemoData()
-  }, [initializeDemoData])
+  // useEffect(() => {
+  //   initializeDemoData()
+  // }, [initializeDemoData])
   
   return (
     <Flex 

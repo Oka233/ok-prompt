@@ -475,6 +475,13 @@ export async function runOptimizationIteration({
   try {
     // 1. 执行测试
     console.log('执行测试...');
+    console.log({
+      prompt: currentPrompt,
+      testCases,
+      apiKey: targetModel.apiKey,
+      baseUrl: targetModel.baseUrl,
+      model: targetModel.name,
+    })
     const testResults = await executeTests({
       prompt: currentPrompt,
       testCases,
@@ -482,9 +489,18 @@ export async function runOptimizationIteration({
       baseUrl: targetModel.baseUrl,
       model: targetModel.name,
     });
+    console.log(testResults)
     
     // 2. 评估结果
     console.log('评估测试结果...');
+    console.log({
+      prompt: currentPrompt,
+      testResults,
+      testMode,
+      apiKey: optimizationModel.apiKey,
+      baseUrl: optimizationModel.baseUrl,
+      model: optimizationModel.name,
+    })
     const evaluatedResults = await evaluateResults({
       prompt: currentPrompt,
       testResults,
@@ -493,6 +509,7 @@ export async function runOptimizationIteration({
       baseUrl: optimizationModel.baseUrl,
       model: optimizationModel.name,
     });
+    console.log(evaluatedResults)
     
     // 3. 总结评估
     console.log('总结评估...');
@@ -540,6 +557,7 @@ export async function runOptimizationIteration({
       });
       
       newPrompt = optimizationResult.newPrompt;
+      console.log('优化后的提示词:', newPrompt);
     }
     
     return {

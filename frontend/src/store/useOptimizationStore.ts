@@ -46,7 +46,6 @@ interface OptimizationState {
   // 优化操作
   startOptimization: (taskId: string) => Promise<void>;
   stopOptimization: (taskId: string) => Promise<void>;
-  continueOptimization: (taskId: string, userFeedback?: string) => Promise<void>;
 
   // 模型管理
   addModel: (name: string, apiKey: string, baseUrl: string) => Promise<void>;
@@ -246,9 +245,12 @@ export const useOptimizationStore = create<OptimizationState>()(
 
           const runIteration = async () => {
             try {
+              const task = get().tasks.find(t => t.id === taskId) as OptimizationTask;
               const currentIteration = task.iterationCount;
+              console.log("当前迭代:", currentIteration);
               const isInitial = currentIteration === 0;
               const currentPrompt = isInitial ? task.initialPrompt : task.currentPrompt;
+              console.log("当前提示词:", currentPrompt);
 
               // 检查是否达到最大迭代次数
               if (task.iterationCount >= task.maxIterations) {
@@ -292,6 +294,8 @@ export const useOptimizationStore = create<OptimizationState>()(
                 waitingForFeedback: task.requireUserFeedback,
               };
 
+              console.log("结果", result)
+
               // 更新测试用例结果
               const updatedTestCases = [...task.details.testCases];
               result.testResults.forEach((testResult: { testCaseIndex: number; output: string; score: number; reasoning: string; }) => {
@@ -308,24 +312,32 @@ export const useOptimizationStore = create<OptimizationState>()(
               });
 
               // 更新任务状态
-              set(state => ({
-                tasks: state.tasks.map(t => 
-                  t.id === taskId 
-                    ? { 
-                        ...t, 
-                        totalTokensUsed: t.totalTokensUsed + result.iterationSummary.iterationTokenUsage,
-                        details: {
-                          testCases: updatedTestCases,
-                          promptIterations: [...t.details.promptIterations, newIteration],
-                        },
-                        currentPrompt: result.newPrompt || t.currentPrompt,
-                        iterationCount: t.iterationCount + 1,
-                        status: result.allPerfect ? 'completed' : t.status,
-                        updatedAt: new Date().toISOString(),
-                      }
-                    : t
-                ),
-              }));
+              set(state => {
+                const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                const updatedTask = {
+                  ...t, 
+                  totalTokensUsed: t.totalTokensUsed + result.iterationSummary.iterationTokenUsage,
+                  details: {
+                    testCases: updatedTestCases,
+                    promptIterations: [...t.details.promptIterations, newIteration],
+                  },
+                  currentPrompt: result.newPrompt || t.currentPrompt,
+                  iterationCount: t.iterationCount + 1,
+                  status: result.allPerfect ? 'completed' : t.status,
+                  updatedAt: new Date().toISOString(),
+                };
+                
+                return {
+                  tasks: state.tasks.map(task => task.id === taskId ? updatedTask : task),
+                  currentPromptIterations: taskId === state.currentTaskId ? updatedTask.details.promptIterations : state.currentPromptIterations
+                };
+              });
+
+              // 验证task是否更新
+              const updatedTask = get().tasks.find(t => t.id === taskId);
+              if (updatedTask) {
+                console.log("任务更新:", updatedTask);
+              }
 
               // 如果全部满分或需要用户反馈，则结束迭代
               if (result.allPerfect || task.requireUserFeedback) {
@@ -378,93 +390,6 @@ export const useOptimizationStore = create<OptimizationState>()(
           }));
           console.log(`停止优化任务: ${taskId}`);
         } catch (error) {
-          set({ error: (error as Error).message, isLoading: false });
-        }
-      },
-      
-      continueOptimization: async (taskId, userFeedback) => {
-        set({ isLoading: true, error: null });
-        try {
-          // 获取任务信息
-          const task = get().tasks.find(t => t.id === taskId);
-          if (!task) {
-            throw new Error(`未找到ID为 ${taskId} 的任务`);
-          }
-          
-          // 获取模型信息
-          const targetModel = task.targetModelId 
-            ? get().models.find(m => m.id === task.targetModelId)
-            : null;
-          const optimizationModel = task.optimizationModelId 
-            ? get().models.find(m => m.id === task.optimizationModelId)
-            : null;
-          
-          if (!targetModel || !optimizationModel) {
-            throw new Error('请先配置目标模型和优化模型');
-          }
-          
-          // 更新最新迭代的用户反馈
-          const latestIteration = task.details.promptIterations
-            .find(pi => pi.waitingForFeedback);
-          
-          if (latestIteration) {
-            set(state => ({
-              tasks: state.tasks.map(t => 
-                t.id === taskId 
-                  ? {
-                      ...t,
-                      details: {
-                        ...t.details,
-                        promptIterations: t.details.promptIterations.map(pi => 
-                          pi.id === latestIteration.id
-                            ? { ...pi, userFeedback, waitingForFeedback: false }
-                            : pi
-                        )
-                      }
-                    }
-                  : t
-              ),
-            }));
-          }
-          
-          // 执行优化
-          const result = await runOptimizationIteration({
-            currentPrompt: task.currentPrompt,
-            testCases: task.testSet.data,
-            testMode: task.testSet.mode,
-            isInitialIteration: false,
-            targetModel: {
-              apiKey: targetModel.apiKey,
-              baseUrl: targetModel.baseUrl,
-              name: targetModel.name,
-            },
-            optimizationModel: {
-              apiKey: optimizationModel.apiKey,
-              baseUrl: optimizationModel.baseUrl,
-              name: optimizationModel.name,
-            },
-            userFeedback
-          });
-
-          // 更新任务状态
-          set(state => ({
-            tasks: state.tasks.map(t => 
-              t.id === taskId 
-                ? { 
-                    ...t, 
-                    currentPrompt: result.newPrompt || t.currentPrompt,
-                    iterationCount: t.iterationCount + 1,
-                    totalTokensUsed: t.totalTokensUsed + result.iterationSummary.iterationTokenUsage,
-                    status: result.allPerfect ? 'completed' : t.status,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : t
-            ),
-            isLoading: false
-          }));
-          
-        } catch (error) {
-          console.error('继续优化失败:', error);
           set({ error: (error as Error).message, isLoading: false });
         }
       },

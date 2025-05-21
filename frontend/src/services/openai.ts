@@ -30,6 +30,7 @@ function getClient(apiKey: string, baseUrl?: string): OpenAI {
   const client = new OpenAI({
     apiKey,
     baseURL: baseUrl || undefined,
+    dangerouslyAllowBrowser: true,
   });
   
   // 缓存实例
