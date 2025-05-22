@@ -16,7 +16,7 @@ import { useOptimizationStore } from '@/store/useOptimizationStore'
 export function PromptIterationList() {
   const currentPromptIterations = useCurrentPromptIterations()
   const currentTask = useOptimizationStore(state => state.tasks.find(t => t.id === state.currentTaskId))
-  const { submitUserFeedback } = useOptimizationStore()
+  const { submitUserFeedback, tasks, currentTaskId } = useOptimizationStore()
   const [openReport, setOpenReport] = useState<string | null>(null)
   const [selectedIteration, setSelectedIteration] = useState<string | null>('0')
   const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({})
@@ -64,18 +64,21 @@ export function PromptIterationList() {
     
     const stageText = {
       'not_started': '未开始',
+      'generated': '已生成',
       'tested': '已测试',
-      'evaluated': '已评估'
+      'evaluated': '已评估',
+      'summarized': '已总结',
     }
 
     const stage = item.stage;
+    const currentIteration = tasks.find(task => task.id === currentTaskId)?.details.promptIterations.find(iteration => iteration.id === item.id)
 
     return (
       <Flex alignItems="center">
         <Badge colorScheme={stageColors[stage as keyof typeof stageColors]} ml={2}>
           {stageText[stage as keyof typeof stageText]}
         </Badge>
-        {currentTask?.status === 'in_progress' && item.iteration === currentTask.iterationCount && (
+        {currentTask?.status === 'in_progress' && item.iteration === currentIteration && (
           <Spinner size="sm" ml={2} color="blue.500" />
         )}
       </Flex>
@@ -105,7 +108,7 @@ export function PromptIterationList() {
           >
             <Flex alignItems="center">
               <Text fontWeight="semibold" color={item.id === selectedIteration ? "blue.700" : "gray.700"}>
-                {item.isInitial ? "初始提示词" : `优化提示词`} (Iteration {item.iteration})
+                {`优化提示词`} (Iteration {item.iteration})
               </Text>
               {getStageBadge(item)}
             </Flex>

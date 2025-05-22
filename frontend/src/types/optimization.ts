@@ -28,7 +28,6 @@ export interface TestCaseResult {
   expectedOutput: string;
   iterationResults: { // 此测试用例在不同提示词迭代下的结果
     iteration: number; // 指的是提示词的迭代轮次
-    isInitial: boolean;
     output: string;
     score: number | null; // 允许为null，表示等待评估
     comment: string;
@@ -39,23 +38,18 @@ export interface PromptIteration {
   id: string;
   iteration: number;
   prompt: string;
-  isInitial: boolean;
   avgScore: number | null;
   reportSummary: string;
   waitingForFeedback: boolean;
   userFeedback?: string;
-  stage: 'not_started' | 'tested' | 'evaluated';
+  stage: 'not_started' | 'generated' | 'tested' | 'evaluated' | 'summarized';
 }
 
 export interface OptimizationTask {
   id: string;
   name: string;
   datasetName: string;
-  datasetPath?: string;
   testSet: TestSet; // 原始测试集定义
-  initialPrompt: string;
-  currentPrompt: string; // 当前最新的提示词
-  iterationCount: number; // 已完成的提示词迭代次数
   maxIterations: number;
   status: 'not_started' | 'in_progress' | 'completed' | 'max_iterations_reached' | 'paused';
   tokenBudget?: number;

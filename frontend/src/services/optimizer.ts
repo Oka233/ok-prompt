@@ -6,6 +6,14 @@ import {
 } from '@/utils/promptTemplates';
 import { TestCase, TestMode } from '@/types/optimization';
 
+export interface InputTestResult {
+  input: string;
+  expectedOutput: string;
+  actualOutput: string;
+  score: number | null; // 允许为null，表示等待评估
+  comment: string | null;
+}
+
 // 定义测试结果类型
 export interface TestResult {
   index: number;
@@ -13,7 +21,17 @@ export interface TestResult {
   expectedOutput: string;
   actualOutput: string;
   score: number;
-  reasoning: string;
+  comment: string;
+  tokenUsage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
+export interface EvaluationResult {
+  score: number;
+  comment: string;
   tokenUsage: {
     promptTokens: number;
     completionTokens: number;
@@ -78,7 +96,7 @@ export async function executeTests({
         expectedOutput: testCase.output,
         actualOutput,
         score: 0, // 初始分数，将在评估阶段更新
-        reasoning: '',
+        comment: '',
         tokenUsage: {
           promptTokens: response.usage.promptTokens,
           completionTokens: response.usage.completionTokens,
@@ -96,7 +114,7 @@ export async function executeTests({
         expectedOutput: testCase.output,
         actualOutput: `错误: ${(error as Error).message}`,
         score: 1, // 失败的测试用例评分为1
-        reasoning: `执行失败: ${(error as Error).message}`,
+        comment: `执行失败: ${(error as Error).message}`,
         tokenUsage: {
           promptTokens: 0,
           completionTokens: 0,
@@ -121,26 +139,28 @@ export async function evaluateResults({
   model,
 }: {
   prompt: string;
-  testResults: TestResult[];
+  testResults: InputTestResult[];
   testMode: TestMode;
   apiKey: string;
   baseUrl?: string;
   model: string;
-}): Promise<TestResult[]> {
-  const evaluatedResults = [...testResults];
+}): Promise<EvaluationResult[]> {
+  const evaluatedResults = [];
   
-  for (let i = 0; i < evaluatedResults.length; i++) {
-    const result = evaluatedResults[i];
+  for (let i = 0; i < testResults.length; i++) {
+    const result = testResults[i];
     
     // 如果是严格模式且输出完全匹配，则自动评分为5分
     if (testMode === 'strict' && result.actualOutput === result.expectedOutput) {
-      result.score = 5;
-      result.reasoning = '系统判定：strict模式下，输出与期望完全匹配。';
-      continue;
-    }
-    
-    // 如果已经有评分（如执行失败的情况），跳过评估
-    if (result.score > 0) {
+      evaluatedResults.push({
+        score: 5,
+        comment: '输出完全匹配',
+        tokenUsage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      });
       continue;
     }
     
@@ -167,20 +187,30 @@ export async function evaluateResults({
       
       // 解析评分和评估理由
       const { score, reasoning } = parseEvaluationResponse(evalResponse);
-      
-      // 更新结果
-      result.score = score;
-      result.reasoning = reasoning;
-      result.tokenUsage.promptTokens += response.usage.promptTokens;
-      result.tokenUsage.completionTokens += response.usage.completionTokens;
-      result.tokenUsage.totalTokens += response.usage.totalTokens;
+
+      evaluatedResults.push({
+        score,
+        comment: reasoning,
+        tokenUsage: {
+          promptTokens: response.usage.promptTokens,
+          completionTokens: response.usage.completionTokens,
+          totalTokens: response.usage.totalTokens,
+        }
+      });
       
     } catch (error) {
       console.error(`评估测试结果 #${i} 时出错:`, error);
       
       // 评估失败时设置默认分数
-      result.score = 2;
-      result.reasoning = `评估失败: ${(error as Error).message}`;
+      evaluatedResults.push({
+        score: 2,
+        comment: `评估失败: ${(error as Error).message}`,
+        tokenUsage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        }
+      });
     }
   }
   
@@ -238,7 +268,7 @@ export async function summarizeEvaluation({
   model,
 }: {
   prompt: string;
-  testResults: TestResult[];
+  testResults: InputTestResult[];
   testMode: TestMode;
   apiKey: string;
   baseUrl?: string;
@@ -258,13 +288,13 @@ export async function summarizeEvaluation({
       totalCases,
       perfectScores,
       avgScore,
-      testResults.map(res => ({
-        index: res.index,
+      testResults.map((res, index) => ({
+        index,
         input: res.input,
         expectedOutput: res.expectedOutput,
         actualOutput: res.actualOutput,
         score: res.score,
-        reasoning: res.reasoning
+        reasoning: res.comment
       }))
     );
     
@@ -322,7 +352,7 @@ export async function optimizePrompt({
 }: {
   currentPrompt: string;
   evaluationSummary: string;
-  testResults: TestResult[];
+  testResults: InputTestResult[];
   testMode: TestMode;
   userFeedback?: string;
   apiKey: string;
@@ -345,7 +375,7 @@ export async function optimizePrompt({
         expectedOutput: result.expectedOutput,
         actualOutput: result.actualOutput,
         score: result.score,
-        reasoning: result.reasoning
+        reasoning: result.comment
       }));
     
     // 如果没有低分用例但仍有用例未达到满分，添加一些代表性用例
@@ -359,7 +389,7 @@ export async function optimizePrompt({
             expectedOutput: result.expectedOutput,
             actualOutput: result.actualOutput,
             score: result.score,
-            reasoning: result.reasoning
+            reasoning: result.comment
           });
         });
     }

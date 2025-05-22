@@ -25,7 +25,7 @@ export function DatasetUploadedView() {
         datasetName={currentTask.datasetName}
         mode={currentTask.testSet.mode}
         status={getStatusText(currentTask.status)}
-        iterationCount={currentTask.iterationCount}
+        iterationCount={currentTask.details.promptIterations.length}
       />
 
       <Flex 

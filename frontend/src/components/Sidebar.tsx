@@ -54,7 +54,7 @@ export function Sidebar() {
       case 'completed':
         return `已完成 (全部测试用例满分)`;
       case 'in_progress':
-        return `进行中 (迭代 ${task.iterationCount}/${task.maxIterations})`;
+        return `进行中 (迭代 ${task.details.promptIterations.length}/${task.maxIterations})`;
       case 'max_iterations_reached':
         return '已达最大迭代';
       default:
