@@ -30,20 +30,21 @@ export interface TestCaseResult {
     iteration: number; // 指的是提示词的迭代轮次
     isInitial: boolean;
     output: string;
-    score: number;
+    score: number | null; // 允许为null，表示等待评估
     comment: string;
   }[];
 }
 
 export interface PromptIteration {
   id: string;
-  iteration: number; // 提示词的迭代轮次
+  iteration: number;
   prompt: string;
   isInitial: boolean;
-  avgScore: number;
+  avgScore: number | null;
   reportSummary: string;
+  waitingForFeedback: boolean;
   userFeedback?: string;
-  waitingForFeedback?: boolean;
+  stage: 'not_started' | 'tested' | 'evaluated';
 }
 
 export interface OptimizationTask {
@@ -56,15 +57,14 @@ export interface OptimizationTask {
   currentPrompt: string; // 当前最新的提示词
   iterationCount: number; // 已完成的提示词迭代次数
   maxIterations: number;
-  status: 'not_started' | 'in_progress' | 'completed' | 'max_iterations_reached';
-  iterationStage: 'not_started' | 'tested' | 'evaluated' | 'optimized'; // 当前迭代阶段
+  status: 'not_started' | 'in_progress' | 'completed' | 'max_iterations_reached' | 'paused';
   tokenBudget?: number;
   totalTokensUsed: number;
   createdAt: string;
   updatedAt: string;
   targetModelId?: string; // 目标模型ID
   optimizationModelId?: string; // 优化模型ID
-  requireUserFeedback?: boolean; // 是否需要用户反馈
+  requireUserFeedback: boolean; // 是否需要用户反馈
 
   details: { // 内嵌的任务详情数据
     testCases: TestCaseResult[]; // 使用统一后的 TestCaseResult

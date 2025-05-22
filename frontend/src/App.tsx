@@ -6,11 +6,25 @@ import { useOptimizationStore } from './store/useOptimizationStore'
 import { Toaster } from "@/components/ui/toaster"
 
 function App() {
-  const { initializeDemoData } = useOptimizationStore()
+  const { initializeDemoData, tasks, currentTaskId, setViewState, selectTask } = useOptimizationStore()
   
+  // 初始化演示数据
   // useEffect(() => {
   //   initializeDemoData()
   // }, [initializeDemoData])
+
+  // 页面加载时检查任务并设置默认视图
+  useEffect(() => {
+    if (tasks.length > 0) {
+      if (!currentTaskId) {
+        // 如果没有选中的任务，选择第一个任务
+        selectTask(tasks[0].id)
+      }
+      setViewState('task_view')
+    } else {
+      setViewState('upload')
+    }
+  }, [tasks, currentTaskId, selectTask, setViewState])
   
   return (
     <Flex 

@@ -10,10 +10,11 @@ import {
   Box,
   Input,
   Textarea,
-  IconButton
+  IconButton,
+  Checkbox
 } from '@chakra-ui/react'
 import { FiUploadCloud, FiPlus, FiTrash2 } from 'react-icons/fi'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 import { TestSet, ModelConfig } from '@/types/optimization'
 
@@ -55,9 +56,17 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
   const { createTask, models } = useOptimizationStore();
   const [targetModelId, setTargetModelId] = useState<string | undefined>(undefined);
   const [optimizationModelId, setOptimizationModelId] = useState<string | undefined>(undefined);
+  const [requireUserFeedback, setRequireUserFeedback] = useState(false);
 
   const modelOptions = useMemo(() => createModelListCollection(models), [models]);
   
+  useEffect(() => {
+    if (models.length > 0) {
+      setTargetModelId(models[0].id);
+      setOptimizationModelId(models[0].id);
+    }
+  }, [models]);
+
   const handleCreateTask = async () => {
     setError(null);
     
@@ -91,7 +100,8 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
         20,
         undefined,
         targetModelId,
-        optimizationModelId
+        optimizationModelId,
+        requireUserFeedback
       );
       
       onUpload();
@@ -331,6 +341,22 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                   </Select.Positioner>
                 </Portal>
               </Select.Root>
+            </Box>
+
+            <Box>
+              <Checkbox.Root
+                defaultChecked={false}
+                onCheckedChange={(details) => {
+                  setRequireUserFeedback(!!details.checked);
+                }}
+              >
+                <Checkbox.HiddenInput />
+                <Checkbox.Control />
+                <Checkbox.Label>需要用户反馈</Checkbox.Label>
+              </Checkbox.Root>
+              <Text fontSize="sm" color="gray.500" mt={1}>
+                启用此选项后，每个优化迭代都需要用户确认才能继续
+              </Text>
             </Box>
             
             <Box>

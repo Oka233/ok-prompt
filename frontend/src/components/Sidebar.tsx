@@ -121,7 +121,6 @@ export function Sidebar() {
           borderRadius="lg"
           _hover={{ bg: 'gray.700' }}
           transition="150ms ease-in-out"
-          mb={4}
           onClick={handleModelManagement}
         >
           <Flex alignItems="center" gap={2}>

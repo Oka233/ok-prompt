@@ -12,9 +12,11 @@ import {
   IconButton,
   HStack,
   VStack,
-  useDisclosure
+  useDisclosure,
+  Spinner,
+  Checkbox
 } from '@chakra-ui/react'
-import { FiTrash2, FiSettings, FiSave, FiXCircle, FiPlay } from 'react-icons/fi'
+import { FiTrash2, FiSettings, FiSave, FiXCircle, FiPlay, FiStopCircle } from 'react-icons/fi'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 import { useState, useEffect } from 'react'
 
@@ -23,7 +25,6 @@ interface OptimizationHeaderProps {
   taskName: string
   datasetName: string
   mode: string
-  status: string
   iterationCount: number
 }
 
@@ -38,23 +39,25 @@ export function OptimizationHeader({
   taskName,
   datasetName,
   mode,
-  status,
   iterationCount
 }: OptimizationHeaderProps) {
   const direction = useBreakpointValue({ base: 'column', md: 'row' }) || 'column';
   const isMobile = direction === 'column';
-  const { deleteTask, models, tasks, updateTaskModels, startOptimization } = useOptimizationStore();
+  const { deleteTask, models, tasks, updateTaskModels, startOptimization, stopOptimization, updateTaskFeedbackSetting } = useOptimizationStore();
   const { open, onOpen, onClose } = useDisclosure();
 
   const currentTask = tasks.find(t => t.id === taskId);
+  const status = currentTask?.status || 'not_started';
 
   const [selectedTargetModel, setSelectedTargetModel] = useState<string | undefined>(currentTask?.targetModelId);
   const [selectedOptimizationModel, setSelectedOptimizationModel] = useState<string | undefined>(currentTask?.optimizationModelId);
+  const [requireUserFeedback, setRequireUserFeedback] = useState(currentTask?.requireUserFeedback || false);
 
   useEffect(() => {
     setSelectedTargetModel(currentTask?.targetModelId);
     setSelectedOptimizationModel(currentTask?.optimizationModelId);
-  }, [currentTask?.targetModelId, currentTask?.optimizationModelId, taskId]);
+    setRequireUserFeedback(currentTask?.requireUserFeedback || false);
+  }, [currentTask?.targetModelId, currentTask?.optimizationModelId, currentTask?.requireUserFeedback, taskId]);
 
   const modelOptionsCollection = createListCollection<ModelOption>({
     items: models.map(model => ({ label: model.name, value: model.id }))
@@ -70,18 +73,26 @@ export function OptimizationHeader({
   const handleSaveAdvancedSettings = async () => {
     if (!currentTask) return;
     await updateTaskModels(taskId, selectedTargetModel, selectedOptimizationModel);
+    await updateTaskFeedbackSetting(taskId, requireUserFeedback);
     onClose();
   };
 
   const handleCancelAdvancedSettings = () => {
     setSelectedTargetModel(currentTask?.targetModelId);
     setSelectedOptimizationModel(currentTask?.optimizationModelId);
+    setRequireUserFeedback(currentTask?.requireUserFeedback || false);
     onClose();
   };
 
   const handleStartOptimization = async () => {
     if (taskId) {
       await startOptimization(taskId);
+    }
+  };
+
+  const handleStopOptimization = async () => {
+    if (taskId) {
+      await stopOptimization(taskId);
     }
   };
   
@@ -117,21 +128,54 @@ export function OptimizationHeader({
             <Text fontSize="sm" color="gray.500">
               状态:
             </Text>
-            <Badge colorScheme={status === 'completed' || status === 'max_iterations_reached' ? 'blue' : (status === 'in_progress' ? 'green' : 'gray')} px={2} py={1} borderRadius="md">
-              {status}
+            <Badge colorScheme={
+              status === 'completed' ? 'blue' : 
+              status === 'in_progress' ? 'green' : 
+              status === 'paused' ? 'yellow' : 
+              'gray'
+            } px={2} py={1} borderRadius="md">
+              {status === 'paused' ? '已暂停' : 
+               status === 'completed' ? '已完成' :
+               status === 'in_progress' ? '进行中' :
+               status === 'max_iterations_reached' ? '已达最大迭代' :
+               '未开始'}
             </Badge>
-            <Button
-              colorScheme="green"
-              size="sm"
-              variant="outline"
-              onClick={handleStartOptimization}
-              disabled={status === 'in_progress' || status === 'completed'}
-            >
-              <Flex align="center" gap={2}>
-                <FiPlay />
-                <Text>开始优化</Text>
-              </Flex>
-            </Button>
+            <Flex alignItems="center" gap={2}>
+              {status === 'in_progress' && (
+                <Spinner size="sm" color="blue.500" />
+              )}
+              {status === 'in_progress' ? (
+                <Button
+                  size="sm"
+                  colorScheme="red"
+                  variant="outline"
+                  onClick={handleStopOptimization}
+                >
+                  <FiStopCircle />
+                  <Text>停止优化</Text>
+                </Button>
+              ) : status === 'paused' ? (
+                <Button
+                  size="sm"
+                  colorScheme="blue"
+                  variant="outline"
+                  onClick={handleStartOptimization}
+                >
+                  <FiPlay />
+                  <Text>继续优化</Text>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  colorScheme="blue"
+                  variant="outline"
+                  onClick={handleStartOptimization}
+                >
+                  <FiPlay />
+                  <Text>开始优化</Text>
+                </Button>
+              )}
+            </Flex>
             <IconButton
               size="sm"
               variant="outline"
@@ -147,9 +191,17 @@ export function OptimizationHeader({
               <FiTrash2 />
             </IconButton>
           </Flex>
-          <Text fontSize="sm" color="gray.500" mt={1}>
-            总迭代次数: <Text as="span" fontWeight="medium" color="gray.700">{iterationCount}</Text>
-          </Text>
+          <Flex justifyContent={isMobile ? "flex-start" : "flex-end"} gap={4} mt={1}>
+            <Text fontSize="sm" color="gray.500">
+              总迭代次数: <Text as="span" fontWeight="medium" color="gray.700">{iterationCount}</Text>
+            </Text>
+            <Text fontSize="sm" color="gray.500">
+              输入Token: <Text as="span" fontWeight="medium" color="gray.700">{currentTask?.totalTokensUsed || 0}</Text>
+            </Text>
+            <Text fontSize="sm" color="gray.500">
+              输出Token: <Text as="span" fontWeight="medium" color="gray.700">{currentTask?.totalTokensUsed || 0}</Text>
+            </Text>
+          </Flex>
         </Box>
       </Flex>
       
@@ -244,6 +296,21 @@ export function OptimizationHeader({
                     </Select.Positioner>
                   </Portal>
                 </Select.Root>
+              </Box>
+              <Box>
+                <Checkbox.Root
+                  checked={requireUserFeedback}
+                  onCheckedChange={(details) => {
+                    setRequireUserFeedback(!!details.checked);
+                  }}
+                >
+                  <Checkbox.HiddenInput />
+                  <Checkbox.Control />
+                  <Checkbox.Label>需要用户反馈</Checkbox.Label>
+                </Checkbox.Root>
+                <Text fontSize="sm" color="gray.500" mt={1}>
+                  启用此选项后，每个优化迭代都需要用户确认才能继续
+                </Text>
               </Box>
               <HStack justifyContent="flex-end" gap={3} mt={2}>
                 <Button size="sm" variant="ghost" onClick={handleCancelAdvancedSettings}>

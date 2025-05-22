@@ -4,7 +4,9 @@ import {
   Text,
   Button,
   Flex,
-  Badge
+  Badge,
+  Spinner,
+  Textarea
 } from '@chakra-ui/react'
 import { useState } from 'react'
 import { BiChevronDown } from 'react-icons/bi'
@@ -14,8 +16,10 @@ import { useOptimizationStore } from '@/store/useOptimizationStore'
 export function PromptIterationList() {
   const currentPromptIterations = useCurrentPromptIterations()
   const currentTask = useOptimizationStore(state => state.tasks.find(t => t.id === state.currentTaskId))
+  const { submitUserFeedback } = useOptimizationStore()
   const [openReport, setOpenReport] = useState<string | null>(null)
   const [selectedIteration, setSelectedIteration] = useState<string | null>('0')
+  const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({})
   
   const toggleReport = (id: string) => {
     if (openReport === id) {
@@ -31,44 +35,50 @@ export function PromptIterationList() {
     console.log(`选择迭代: ${id}`);
   }
 
+  const handleFeedbackChange = (iterationId: string, value: string) => {
+    setFeedbackInputs(prev => ({
+      ...prev,
+      [iterationId]: value
+    }))
+  }
+
+  const handleSubmitFeedback = async (iterationId: string) => {
+    const feedback = feedbackInputs[iterationId]
+    if (!feedback?.trim()) {
+      alert('请输入反馈内容')
+      return
+    }
+    try {
+      await submitUserFeedback(currentTask?.id || '', iterationId, feedback)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '提交反馈失败')
+    }
+  }
+
   const getStageBadge = (item: any) => {
     const stageColors = {
       'not_started': 'gray',
       'tested': 'blue',
-      'evaluated': 'purple',
-      'optimized': 'green',
-      'completed': 'green',
-      'pending': 'yellow'
+      'evaluated': 'purple'
     }
     
     const stageText = {
       'not_started': '未开始',
       'tested': '已测试',
-      'evaluated': '已评估',
-      'optimized': '已优化',
-      'completed': '已完成',
-      'pending': '等待中'
+      'evaluated': '已评估'
     }
 
-    let stage = 'not_started'
-    
-    // 如果任务正在进行中且是当前迭代
-    if (currentTask?.status === 'in_progress' && item.iteration === currentTask.iterationCount) {
-      stage = currentTask.iterationStage
-    } 
-    // 如果迭代已完成（当前迭代之前的迭代）
-    else if (item.iteration < (currentTask?.iterationCount || 0)) {
-      stage = 'completed'
-    }
-    // 如果迭代还未开始（当前迭代之后的迭代）
-    else if (item.iteration > (currentTask?.iterationCount || 0)) {
-      stage = 'pending'
-    }
+    const stage = item.stage;
 
     return (
-      <Badge colorScheme={stageColors[stage as keyof typeof stageColors]} ml={2}>
-        {stageText[stage as keyof typeof stageText]}
-      </Badge>
+      <Flex alignItems="center">
+        <Badge colorScheme={stageColors[stage as keyof typeof stageColors]} ml={2}>
+          {stageText[stage as keyof typeof stageText]}
+        </Badge>
+        {currentTask?.status === 'in_progress' && item.iteration === currentTask.iterationCount && (
+          <Spinner size="sm" ml={2} color="blue.500" />
+        )}
+      </Flex>
     )
   }
 
@@ -137,6 +147,33 @@ export function PromptIterationList() {
                   {item.reportSummary}
                 </Box>
               )}
+
+              {/* 用户反馈区域 */}
+              { (item?.userFeedback || (item.waitingForFeedback && item.stage) === 'evaluated') && (
+                    <Box mt={3}>
+                      <Text fontSize="xs" fontWeight="medium" mb={1}>用户反馈：</Text>
+                      <Textarea
+                        value={item.userFeedback || feedbackInputs[item.id] || ''}
+                        onChange={(e) => handleFeedbackChange(item.id, e.target.value)}
+                        placeholder="请输入您的反馈..."
+                        size="sm"
+                        disabled={!!item.userFeedback}
+                        mb={2}
+                      />
+                      {!item.userFeedback && (
+                        <Button
+                          size="sm"
+                          colorScheme="blue"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleSubmitFeedback(item.id)
+                          }}
+                        >
+                          提交反馈
+                        </Button>
+                      )}
+                    </Box>
+                  )}
             </Box>
           </Box>
         ))}
