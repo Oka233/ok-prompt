@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { OptimizationTask, TestSet, ModelConfig, TestCaseResult, PromptIteration } from '@/types/optimization';
-import { runOptimizationIteration } from '@/services/optimizer';
+import { OptimizationTask, TestSet, ModelConfig, TestCaseResult, PromptIteration, TestCase, TestMode, OptimizationIterationResult } from '@/types/optimization';
+import { executeTests, evaluateResults, summarizeEvaluation, optimizePrompt } from '@/services/optimizer';
+import { toaster } from "@/components/ui/toaster";
 
 // 添加视图状态类型
 export type ViewState = 'upload' | 'task_view' | 'model_management';
@@ -17,20 +18,13 @@ interface OptimizationState {
   // 基本状态
   tasks: OptimizationTask[];
   currentTaskId: string | null;
-  isLoading: boolean;
   error: string | null;
   
   // 视图状态
   viewState: ViewState;
   
-  // 测试用例和迭代数据
-  taskDetails: TaskDetailData[];
-  currentTestCases: TestCaseResult[];
-  currentPromptIterations: PromptIteration[];
-  
   // 模型管理
   models: ModelConfig[];
-  currentModelId: string | null;
   
   // 任务管理
   createTask: (name: string, testSet: TestSet, initialPrompt: string, maxIterations?: number, tokenBudget?: number, targetModelId?: string, optimizationModelId?: string, requireUserFeedback?: boolean) => Promise<void>;
@@ -51,7 +45,6 @@ interface OptimizationState {
   addModel: (name: string, apiKey: string, baseUrl: string) => Promise<void>;
   updateModel: (id: string, data: Partial<ModelConfig>) => Promise<void>;
   deleteModel: (id: string) => Promise<void>;
-  selectModel: (id: string | null) => void;
 
   // 高级操作 (占位)
   exportTask: (taskId: string) => Promise<string>;
@@ -67,14 +60,9 @@ export const useOptimizationStore = create<OptimizationState>()(
     (set, get) => ({
       tasks: [],
       currentTaskId: null,
-      isLoading: false,
       error: null,
       viewState: 'upload',
-      taskDetails: [],
-      currentTestCases: [],
-      currentPromptIterations: [],
       models: [],
-      currentModelId: null,
       
       // 视图控制
       setViewState: (state) => {
@@ -84,13 +72,13 @@ export const useOptimizationStore = create<OptimizationState>()(
       
       // 任务管理
       createTask: async (name, testSet, initialPrompt, maxIterations = 20, tokenBudget, targetModelId, optimizationModelId, requireUserFeedback = false) => {
-        set({ isLoading: true, error: null });
+        set({ error: null });
         try {
           const initialTestCases: TestCaseResult[] = testSet.data.map((tc, index) => ({
             id: crypto.randomUUID(),
             index: index + 1,
             input: tc.input,
-            expectedOutput: tc.output, // 在TestSet中是output，这里对应expectedOutput
+            expectedOutput: tc.output,
             iterationResults: [] 
           }));
 
@@ -99,20 +87,22 @@ export const useOptimizationStore = create<OptimizationState>()(
             iteration: 0,
             prompt: initialPrompt,
             isInitial: true,
-            avgScore: 0, // 初始时尚无评分
-            reportSummary: '任务已创建，等待首次优化运行。',
+            avgScore: 0,
+            reportSummary: '初始提示词，等待首次评估。',
+            waitingForFeedback: requireUserFeedback
           };
 
           const newTask: OptimizationTask = {
             id: crypto.randomUUID(),
             name,
             datasetName: testSet.data.length > 0 ? `dataset-${new Date().toISOString().slice(0, 10)}` : '手动创建任务',
-            testSet, // 保留原始testSet
+            testSet,
             initialPrompt,
             currentPrompt: initialPrompt,
             iterationCount: 0,
             maxIterations,
             status: 'not_started',
+            iterationStage: 'not_started',
             tokenBudget,
             totalTokensUsed: 0,
             createdAt: new Date().toISOString(),
@@ -130,34 +120,25 @@ export const useOptimizationStore = create<OptimizationState>()(
             tasks: [newTask, ...state.tasks],
             currentTaskId: newTask.id,
             viewState: 'task_view',
-            currentTestCases: newTask.details.testCases,
-            currentPromptIterations: newTask.details.promptIterations,
-            isLoading: false
           }));          
         } catch (error) {
-          set({ error: (error as Error).message, isLoading: false });
+          set({ error: (error as Error).message });
         }
       },
       
       loadTasks: async () => {
-        set({ isLoading: true, error: null });
+        set({ error: null });
         try {
-          // zustand persist 会自动加载 'tasks' 和 'models'
-          // 如果当前没有选中任务，但存在任务，则默认选择第一个
           const tasks = get().tasks;
           if (tasks.length > 0 && !get().currentTaskId) {
             const firstTask = tasks[0];
             set({
               currentTaskId: firstTask.id,
-              currentTestCases: firstTask.details.testCases,
-              currentPromptIterations: firstTask.details.promptIterations,
-              // viewState: 'task_view' // 可选：如果加载后直接看任务
+              // viewState: 'task_view'
             });
           }
         } catch (error) {
           set({ error: (error as Error).message });
-        } finally {
-          set({ isLoading: false });
         }
       },
       
@@ -167,41 +148,30 @@ export const useOptimizationStore = create<OptimizationState>()(
           set({ 
             currentTaskId: taskId,
             viewState: 'task_view',
-            currentTestCases: task.details.testCases,
-            currentPromptIterations: task.details.promptIterations
           });
           console.log(`已选择任务: ${taskId}, 已从任务内部加载详细数据`);
         } else {
           set({ 
             currentTaskId: null, 
-            currentTestCases: [], 
-            currentPromptIterations: [],
-            // viewState: 'upload' // 如果任务找不到，可以考虑切回上传界面
+            viewState: 'upload' 
           });
           console.warn(`选择任务失败: 未找到ID为 ${taskId} 的任务`);
         }
       },
       
       deleteTask: async (taskId) => {
-        set({ isLoading: true, error: null });
+        set({ error: null });
         try {
           set(state => {
             const newTasks = state.tasks.filter(task => task.id !== taskId);
             let newCurrentTaskId = state.currentTaskId;
             let newViewState = state.viewState;
-            let newCurrentTestCases = state.currentTestCases;
-            let newCurrentPromptIterations = state.currentPromptIterations;
-
             if (state.currentTaskId === taskId) {
               if (newTasks.length > 0) {
                 newCurrentTaskId = newTasks[0].id;
-                newCurrentTestCases = newTasks[0].details.testCases;
-                newCurrentPromptIterations = newTasks[0].details.promptIterations;
                 newViewState = 'task_view';
               } else {
                 newCurrentTaskId = null;
-                newCurrentTestCases = [];
-                newCurrentPromptIterations = [];
                 newViewState = 'upload';
               }
             }
@@ -209,21 +179,18 @@ export const useOptimizationStore = create<OptimizationState>()(
               tasks: newTasks,
               currentTaskId: newCurrentTaskId,
               viewState: newViewState,
-              currentTestCases: newCurrentTestCases,
-              currentPromptIterations: newCurrentPromptIterations,
-              isLoading: false
-              // taskDetails 不再需要单独处理
             };
           });
           console.log(`已删除任务: ${taskId}`);
         } catch (error) {
-          set({ error: (error as Error).message, isLoading: false });
+          set({ error: (error as Error).message });
         }
       },
       
       // 优化操作
       startOptimization: async (taskId) => {
-        set({ isLoading: true, error: null });
+        set({ error: null });
+        let toasterId : string | undefined = undefined;
         try {
           // 获取任务信息
           const task = get().tasks.find(t => t.id === taskId);
@@ -243,11 +210,32 @@ export const useOptimizationStore = create<OptimizationState>()(
             throw new Error('请先配置目标模型和优化模型');
           }
 
+          // 更新任务状态为进行中
+          set(state => ({
+            tasks: state.tasks.map(t => 
+              t.id === taskId 
+                ? { ...t, status: 'in_progress', iterationStage: 'not_started', updatedAt: new Date().toISOString() }
+                : t
+            )
+          }));
+
           const runIteration = async () => {
             try {
               const task = get().tasks.find(t => t.id === taskId) as OptimizationTask;
               const currentIteration = task.iterationCount;
               console.log("当前迭代:", currentIteration);
+              if (toasterId) {
+                toaster.update(toasterId, {
+                  title: `${task.name} - 迭代${currentIteration + 1}优化中`,
+                  description: `正在运行测试用例`,
+                });
+              } else {
+                toasterId = toaster.create({
+                  title: `${task.name} - 迭代${currentIteration + 1}优化中`,
+                  description: `正在运行测试用例`,
+                  type: "loading",
+                })
+              }
               const isInitial = currentIteration === 0;
               const currentPrompt = isInitial ? task.initialPrompt : task.currentPrompt;
               console.log("当前提示词:", currentPrompt);
@@ -257,11 +245,275 @@ export const useOptimizationStore = create<OptimizationState>()(
                 set(state => ({
                   tasks: state.tasks.map(t => 
                     t.id === taskId 
-                      ? { ...t, status: 'max_iterations_reached', updatedAt: new Date().toISOString() }
+                      ? { ...t, status: 'max_iterations_reached', iterationStage: 'not_started', updatedAt: new Date().toISOString() }
                       : t
                   ),
                 }));
                 return;
+              }
+
+              const runOptimizationIteration = async ({
+                currentPrompt,
+                testCases,
+                testMode,
+                targetModel,
+                optimizationModel,
+                userFeedback,
+              }: {
+                currentPrompt: string;
+                testCases: TestCase[];
+                testMode: TestMode;
+                targetModel: { apiKey: string; baseUrl?: string; name: string };
+                optimizationModel: { apiKey: string; baseUrl?: string; name: string };
+                userFeedback?: string;
+              }): Promise<OptimizationIterationResult> => {
+                try {
+                  // 1. 执行测试
+                  console.log('执行测试...');
+                  const testResults = await executeTests({
+                    prompt: currentPrompt,
+                    testCases,
+                    apiKey: targetModel.apiKey,
+                    baseUrl: targetModel.baseUrl,
+                    model: targetModel.name,
+                  });
+                  
+                  // 更新测试阶段和测试结果
+                  set(state => {
+                    const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                    const updatedTestCases = [...t.details.testCases];
+                    testResults.forEach((result, index) => {
+                      if (updatedTestCases[index]) {
+                        updatedTestCases[index].iterationResults.push({
+                          iteration: t.iterationCount,
+                          isInitial: t.iterationCount === 0,
+                          output: result.actualOutput,
+                          score: 0, // 暂时设为0，等待评估
+                          comment: '测试完成，等待评估',
+                        });
+                      }
+                    });
+                    
+                    // 更新迭代记录的测试状态
+                    const updatedIterations = t.details.promptIterations.map(iteration => {
+                      if (iteration.iteration === t.iterationCount) {
+                        return {
+                          ...iteration,
+                          reportSummary: '测试完成，正在评估结果。'
+                        };
+                      }
+                      return iteration;
+                    });
+                    
+                    return {
+                      tasks: state.tasks.map(t => 
+                        t.id === taskId 
+                          ? { 
+                              ...t, 
+                              iterationStage: 'tested',
+                              details: {
+                                ...t.details,
+                                testCases: updatedTestCases,
+                                promptIterations: updatedIterations
+                              },
+                              updatedAt: new Date().toISOString() 
+                            }
+                          : t
+                      )
+                    };
+                  });
+                  
+                  // 2. 评估结果
+                  toaster.update(toasterId as string, {
+                    description: `正在评估测试结果`,
+                  });
+                  console.log('评估测试结果...');
+                  const evaluatedResults = await evaluateResults({
+                    prompt: currentPrompt,
+                    testResults,
+                    testMode,
+                    apiKey: optimizationModel.apiKey,
+                    baseUrl: optimizationModel.baseUrl,
+                    model: optimizationModel.name,
+                  });
+                  
+                  // 更新评估阶段和评估结果
+                  set(state => {
+                    const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                    const updatedTestCases = [...t.details.testCases];
+                    evaluatedResults.forEach((result, index) => {
+                      if (updatedTestCases[index]) {
+                        const lastResult = updatedTestCases[index].iterationResults[updatedTestCases[index].iterationResults.length - 1];
+                        if (lastResult) {
+                          lastResult.score = result.score;
+                          lastResult.comment = result.reasoning;
+                        }
+                      }
+                    });
+                    
+                    // 更新迭代记录的评估状态
+                    const updatedIterations = t.details.promptIterations.map(iteration => {
+                      if (iteration.iteration === t.iterationCount) {
+                        return {
+                          ...iteration,
+                          reportSummary: '评估完成，正在总结结果。'
+                        };
+                      }
+                      return iteration;
+                    });
+                    
+                    return {
+                      tasks: state.tasks.map(t => 
+                        t.id === taskId 
+                          ? { 
+                              ...t, 
+                              iterationStage: 'evaluated',
+                              details: {
+                                ...t.details,
+                                testCases: updatedTestCases,
+                                promptIterations: updatedIterations
+                              },
+                              updatedAt: new Date().toISOString() 
+                            }
+                          : t
+                      )
+                    };
+                  });
+                  
+                  // 3. 总结评估
+                  toaster.update(toasterId as string, {
+                    description: `正在总结测试结果`,
+                  });
+                  console.log('总结评估...');
+                  const summary = await summarizeEvaluation({
+                    prompt: currentPrompt,
+                    testResults: evaluatedResults,
+                    testMode,
+                    apiKey: optimizationModel.apiKey,
+                    baseUrl: optimizationModel.baseUrl,
+                    model: optimizationModel.name,
+                  });
+                  
+                  // 计算使用的token总数
+                  const iterationTokenUsage = evaluatedResults.reduce(
+                    (total, result) => total + result.tokenUsage.totalTokens, 
+                    summary.tokenUsage.totalTokens
+                  );
+                  
+                  // 提取测试结果
+                  const processedTestResults = evaluatedResults.map(result => ({
+                    testCaseIndex: result.index,
+                    output: result.actualOutput,
+                    score: result.score,
+                    reasoning: result.reasoning,
+                  }));
+                  
+                  // 检查是否全部满分
+                  const allPerfect = summary.perfectScoreCount === summary.totalCases;
+                  
+                  let newPrompt: string | undefined;
+                  
+                  // 如果未达到全部满分，且不是等待用户反馈，则优化提示词
+                  if (!allPerfect) {
+                    // 4. 优化提示词
+                    console.log('优化提示词...');
+                    toaster.update(toasterId as string, {
+                      description: `正在优化提示词`,
+                    });
+                    const optimizationResult = await optimizePrompt({
+                      currentPrompt,
+                      evaluationSummary: summary.summaryReport,
+                      testResults: evaluatedResults,
+                      testMode,
+                      userFeedback,
+                      apiKey: optimizationModel.apiKey,
+                      baseUrl: optimizationModel.baseUrl,
+                      model: optimizationModel.name,
+                    });
+                    
+                    newPrompt = optimizationResult.newPrompt;
+                    console.log('优化后的提示词:', newPrompt);
+
+                    // 如果生成了新的提示词，创建新的迭代记录
+                    if (newPrompt) {
+                      const newIteration: PromptIteration = {
+                        id: crypto.randomUUID(),
+                        iteration: task.iterationCount + 1,
+                        prompt: newPrompt,
+                        isInitial: false,
+                        avgScore: 0,
+                        reportSummary: '新提示词已生成，等待测试和评估。',
+                        waitingForFeedback: task.requireUserFeedback,
+                      };
+
+                      set(state => ({
+                        tasks: state.tasks.map(t => 
+                          t.id === taskId 
+                            ? { 
+                                ...t, 
+                                details: {
+                                  ...t.details,
+                                  promptIterations: [...t.details.promptIterations, newIteration]
+                                },
+                                updatedAt: new Date().toISOString() 
+                              }
+                            : t
+                        )
+                      }));
+                    }
+                  }
+                  
+                  // 更新优化阶段和最终结果
+                  set(state => {
+                    const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                    
+                    // 更新迭代记录的最终状态
+                    const updatedIterations = t.details.promptIterations.map(iteration => {
+                      if (iteration.iteration === t.iterationCount) {
+                        return {
+                          ...iteration,
+                          avgScore: summary.avgScore,
+                          reportSummary: summary.summaryReport,
+                        };
+                      }
+                      return iteration;
+                    });
+                    
+                    return {
+                      tasks: state.tasks.map(t => 
+                        t.id === taskId 
+                          ? { 
+                              ...t, 
+                              iterationStage: 'optimized',
+                              currentPrompt: newPrompt || t.currentPrompt,
+                              details: {
+                                ...t.details,
+                                promptIterations: updatedIterations
+                              },
+                              updatedAt: new Date().toISOString() 
+                            }
+                          : t
+                      )
+                    };
+                  });
+                  
+                  return {
+                    newPrompt,
+                    allPerfect,
+                    iterationSummary: {
+                      iterationTokenUsage,
+                      avgScore: summary.avgScore,
+                      perfectScoreCount: summary.perfectScoreCount,
+                      totalCases: summary.totalCases,
+                      summaryReport: summary.summaryReport,
+                    },
+                    testResults: processedTestResults,
+                  };
+                  
+                } catch (error) {
+                  console.error('优化迭代执行失败:', error);
+                  throw error;
+                }
               }
 
               // 执行优化迭代
@@ -269,7 +521,6 @@ export const useOptimizationStore = create<OptimizationState>()(
                 currentPrompt,
                 testCases: task.testSet.data,
                 testMode: task.testSet.mode,
-                isInitialIteration: isInitial,
                 targetModel: {
                   apiKey: targetModel.apiKey,
                   baseUrl: targetModel.baseUrl,
@@ -282,54 +533,20 @@ export const useOptimizationStore = create<OptimizationState>()(
                 }
               });
 
-              // 创建新的迭代记录
-              const newIterationId = crypto.randomUUID();
-              const newIteration: PromptIteration = {
-                id: newIterationId,
-                iteration: currentIteration,
-                prompt: currentPrompt,
-                isInitial,
-                avgScore: result.iterationSummary.avgScore,
-                reportSummary: result.iterationSummary.summaryReport,
-                waitingForFeedback: task.requireUserFeedback,
-              };
-
-              console.log("结果", result)
-
-              // 更新测试用例结果
-              const updatedTestCases = [...task.details.testCases];
-              result.testResults.forEach((testResult: { testCaseIndex: number; output: string; score: number; reasoning: string; }) => {
-                const testCase = updatedTestCases[testResult.testCaseIndex];
-                if (testCase) {
-                  testCase.iterationResults.push({
-                    iteration: currentIteration,
-                    isInitial,
-                    output: testResult.output,
-                    score: testResult.score,
-                    comment: testResult.reasoning,
-                  });
-                }
-              });
-
               // 更新任务状态
               set(state => {
                 const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
                 const updatedTask = {
                   ...t, 
                   totalTokensUsed: t.totalTokensUsed + result.iterationSummary.iterationTokenUsage,
-                  details: {
-                    testCases: updatedTestCases,
-                    promptIterations: [...t.details.promptIterations, newIteration],
-                  },
-                  currentPrompt: result.newPrompt || t.currentPrompt,
                   iterationCount: t.iterationCount + 1,
                   status: result.allPerfect ? 'completed' : t.status,
+                  iterationStage: 'not_started', // 迭代完成后重置为未开始状态
                   updatedAt: new Date().toISOString(),
-                };
+                } as OptimizationTask;
                 
                 return {
                   tasks: state.tasks.map(task => task.id === taskId ? updatedTask : task),
-                  currentPromptIterations: taskId === state.currentTaskId ? updatedTask.details.promptIterations : state.currentPromptIterations
                 };
               });
 
@@ -361,36 +578,34 @@ export const useOptimizationStore = create<OptimizationState>()(
 
           // 开始第一轮迭代
           await runIteration();
-          
-          set({ isLoading: false });
         } catch (error) {
           console.error('开始优化失败:', error);
           set({ 
-            error: (error as Error).message, 
-            isLoading: false,
+            error: (error as Error).message,
             tasks: get().tasks.map(t => 
               t.id === taskId 
                 ? { ...t, status: 'not_started', updatedAt: new Date().toISOString() }
                 : t
             )
           });
+        } finally {
+          toaster.dismiss(toasterId);
         }
       },
       
       stopOptimization: async (taskId) => {
-        set({ isLoading: true, error: null });
+        set({ error: null });
         try {
           set(state => ({
             tasks: state.tasks.map(task => 
               task.id === taskId 
-                ? { ...task, status: 'completed', updatedAt: new Date().toISOString() }
+                ? { ...task, status: 'completed', iterationStage: 'not_started', updatedAt: new Date().toISOString() }
                 : task
             ),
-            isLoading: false
           }));
           console.log(`停止优化任务: ${taskId}`);
         } catch (error) {
-          set({ error: (error as Error).message, isLoading: false });
+          set({ error: (error as Error).message });
         }
       },
       
@@ -416,7 +631,7 @@ export const useOptimizationStore = create<OptimizationState>()(
       
       // 模型管理 (保持不变,仅列出)
       addModel: async (name, apiKey, baseUrl) => {
-        set({ isLoading: true, error: null });
+        set({ error: null });
         try {
           const newModel: ModelConfig = {
             id: crypto.randomUUID(),
@@ -428,16 +643,14 @@ export const useOptimizationStore = create<OptimizationState>()(
           };
           set(state => ({ 
             models: [...state.models, newModel],
-            currentModelId: newModel.id,
-            isLoading: false
           })); 
           console.log(`已添加模型: ${name}`);
         } catch (error) {
-          set({ error: (error as Error).message, isLoading: false });
+          set({ error: (error as Error).message });
         }
       },
       updateModel: async (id, data) => {
-        set({ isLoading: true, error: null });
+        set({ error: null });
         try {
           set(state => ({
             models: state.models.map(model => 
@@ -445,15 +658,14 @@ export const useOptimizationStore = create<OptimizationState>()(
                 ? { ...model, ...data, updatedAt: new Date().toISOString() }
                 : model
             ),
-            isLoading: false
           }));
           console.log(`已更新模型: ${id}`);
         } catch (error) {
-          set({ error: (error as Error).message, isLoading: false });
+          set({ error: (error as Error).message });
         }
       },
       deleteModel: async (id) => {
-        set({ isLoading: true, error: null });
+        set({ error: null });
         try {
           set(state => {
             const tasksUsingModel = state.tasks.filter(
@@ -464,18 +676,12 @@ export const useOptimizationStore = create<OptimizationState>()(
             }
             return {
               models: state.models.filter(model => model.id !== id),
-              currentModelId: state.currentModelId === id ? null : state.currentModelId,
-              isLoading: false
             };
           });
           console.log(`已删除模型: ${id}`);
         } catch (error) {
-          set({ error: (error as Error).message, isLoading: false });
+          set({ error: (error as Error).message });
         }
-      },
-      selectModel: (id) => {
-        set({ currentModelId: id });
-        console.log(`已选择模型: ${id}`);
       },
       
       // 任务模型关联 (保持不变,仅列出)
@@ -578,6 +784,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             iterationCount: 3,
             maxIterations: 10,
             status: 'completed',
+            iterationStage: 'optimized',
             totalTokensUsed: 12500,
             createdAt: '2024-05-15T10:00:00Z',
             updatedAt: '2024-05-15T11:30:00Z',
@@ -596,6 +803,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             iterationCount: 3,
             maxIterations: 10,
             status: 'in_progress',
+            iterationStage: 'evaluated',
             totalTokensUsed: 8200,
             createdAt: '2024-05-12T14:00:00Z',
             updatedAt: '2024-05-12T15:45:00Z',
@@ -614,6 +822,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             iterationCount: 10,
             maxIterations: 10,
             status: 'max_iterations_reached',
+            iterationStage: 'not_started',
             totalTokensUsed: 18900,
             createdAt: '2024-05-10T09:00:00Z',
             updatedAt: '2024-05-10T11:20:00Z',
@@ -630,9 +839,7 @@ export const useOptimizationStore = create<OptimizationState>()(
         set({
           tasks: demoTasks,
           currentTaskId: defaultTask ? defaultTask.id : null,
-          currentTestCases: defaultTask ? defaultTask.details.testCases : [],
-          currentPromptIterations: defaultTask ? defaultTask.details.promptIterations : [],
-          viewState: defaultTask ? 'task_view' : 'upload' // 如果有任务则显示，否则上传
+          viewState: defaultTask ? 'task_view' : 'upload'
         });
         
         console.log('已初始化演示数据，任务详情已内嵌。');
@@ -648,3 +855,18 @@ export const useOptimizationStore = create<OptimizationState>()(
     }
   )
 );
+
+// 选择器：获取当前任务的测试用例和提示词迭代
+export const useCurrentTestCases = () => useOptimizationStore(state => {
+  const currentTaskId = state.currentTaskId;
+  if (!currentTaskId) return [];
+  const task = state.tasks.find(t => t.id === currentTaskId);
+  return task?.details.testCases || [];
+});
+
+export const useCurrentPromptIterations = () => useOptimizationStore(state => {
+  const currentTaskId = state.currentTaskId;
+  if (!currentTaskId) return [];
+  const task = state.tasks.find(t => t.id === currentTaskId);
+  return task?.details.promptIterations || [];
+});

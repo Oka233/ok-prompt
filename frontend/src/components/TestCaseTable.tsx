@@ -5,10 +5,10 @@ import {
   Flex,
   Table
 } from '@chakra-ui/react'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
+import { useCurrentTestCases } from '@/store/useOptimizationStore'
 
 export function TestCaseTable() {
-  const { currentTestCases } = useOptimizationStore()
+  const currentTestCases = useCurrentTestCases()
 
   // 计算最大迭代次数，用于确定需要显示多少列
   const maxIterationCount = currentTestCases.reduce((max, testCase) => {

@@ -3,11 +3,11 @@ import { Sidebar } from '@/components/Sidebar'
 import { MainContent } from './components/MainContent'
 import { useEffect } from 'react'
 import { useOptimizationStore } from './store/useOptimizationStore'
+import { Toaster } from "@/components/ui/toaster"
 
 function App() {
   const { initializeDemoData } = useOptimizationStore()
   
-  // 初始化演示数据
   // useEffect(() => {
   //   initializeDemoData()
   // }, [initializeDemoData])
@@ -21,6 +21,7 @@ function App() {
     >
       <Sidebar />
       <MainContent />
+      <Toaster />
     </Flex>
   )
 }

@@ -3,14 +3,17 @@ import {
   Heading, 
   Text,
   Button,
-  Flex
+  Flex,
+  Badge
 } from '@chakra-ui/react'
 import { useState } from 'react'
 import { BiChevronDown } from 'react-icons/bi'
+import { useCurrentPromptIterations } from '@/store/useOptimizationStore'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 
 export function PromptIterationList() {
-  const { currentPromptIterations } = useOptimizationStore()
+  const currentPromptIterations = useCurrentPromptIterations()
+  const currentTask = useOptimizationStore(state => state.tasks.find(t => t.id === state.currentTaskId))
   const [openReport, setOpenReport] = useState<string | null>(null)
   const [selectedIteration, setSelectedIteration] = useState<string | null>('0')
   
@@ -26,6 +29,47 @@ export function PromptIterationList() {
   const handleSelectIteration = (id: string) => {
     setSelectedIteration(id)
     console.log(`选择迭代: ${id}`);
+  }
+
+  const getStageBadge = (item: any) => {
+    const stageColors = {
+      'not_started': 'gray',
+      'tested': 'blue',
+      'evaluated': 'purple',
+      'optimized': 'green',
+      'completed': 'green',
+      'pending': 'yellow'
+    }
+    
+    const stageText = {
+      'not_started': '未开始',
+      'tested': '已测试',
+      'evaluated': '已评估',
+      'optimized': '已优化',
+      'completed': '已完成',
+      'pending': '等待中'
+    }
+
+    let stage = 'not_started'
+    
+    // 如果任务正在进行中且是当前迭代
+    if (currentTask?.status === 'in_progress' && item.iteration === currentTask.iterationCount) {
+      stage = currentTask.iterationStage
+    } 
+    // 如果迭代已完成（当前迭代之前的迭代）
+    else if (item.iteration < (currentTask?.iterationCount || 0)) {
+      stage = 'completed'
+    }
+    // 如果迭代还未开始（当前迭代之后的迭代）
+    else if (item.iteration > (currentTask?.iterationCount || 0)) {
+      stage = 'pending'
+    }
+
+    return (
+      <Badge colorScheme={stageColors[stage as keyof typeof stageColors]} ml={2}>
+        {stageText[stage as keyof typeof stageText]}
+      </Badge>
+    )
   }
 
   return (
@@ -49,9 +93,12 @@ export function PromptIterationList() {
             transition="150ms ease-in-out"
             onClick={() => handleSelectIteration(item.id)}
           >
-            <Text fontWeight="semibold" color={item.id === selectedIteration ? "blue.700" : "gray.700"}>
-              {item.isInitial ? "初始提示词" : `优化提示词`} (Iteration {item.iteration})
-            </Text>
+            <Flex alignItems="center">
+              <Text fontWeight="semibold" color={item.id === selectedIteration ? "blue.700" : "gray.700"}>
+                {item.isInitial ? "初始提示词" : `优化提示词`} (Iteration {item.iteration})
+              </Text>
+              {getStageBadge(item)}
+            </Flex>
             <Text fontSize="sm" color="gray.600" mt={2} mb={2}>
               "{item.prompt}"
             </Text>
@@ -96,4 +143,4 @@ export function PromptIterationList() {
       </Box>
     </Box>
   )
-} 
+}

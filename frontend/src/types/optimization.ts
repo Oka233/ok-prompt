@@ -57,6 +57,7 @@ export interface OptimizationTask {
   iterationCount: number; // 已完成的提示词迭代次数
   maxIterations: number;
   status: 'not_started' | 'in_progress' | 'completed' | 'max_iterations_reached';
+  iterationStage: 'not_started' | 'tested' | 'evaluated' | 'optimized'; // 当前迭代阶段
   tokenBudget?: number;
   totalTokensUsed: number;
   createdAt: string;
@@ -69,4 +70,23 @@ export interface OptimizationTask {
     testCases: TestCaseResult[]; // 使用统一后的 TestCaseResult
     promptIterations: PromptIteration[]; // 使用统一后的 PromptIteration
   };
-} 
+}
+
+// 定义优化迭代结果类型
+export interface OptimizationIterationResult {
+  newPrompt?: string;
+  allPerfect: boolean;
+  iterationSummary: {
+    iterationTokenUsage: number;
+    avgScore: number;
+    perfectScoreCount: number;
+    totalCases: number;
+    summaryReport: string;
+  };
+  testResults: {
+    testCaseIndex: number;
+    output: string;
+    score: number;
+    reasoning: string;
+  }[];
+}

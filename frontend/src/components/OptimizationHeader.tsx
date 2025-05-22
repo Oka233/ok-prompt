@@ -133,21 +133,19 @@ export function OptimizationHeader({
               </Flex>
             </Button>
             <IconButton
-              aria-label="高级设置"
               size="sm"
               variant="outline"
               onClick={onOpen}
             >
               <FiSettings />
             </IconButton>
-            <Button
-              colorScheme="red"
+            <IconButton
               variant="outline"
               size="sm"
               onClick={handleDelete}
             >
               <FiTrash2 />
-            </Button>
+            </IconButton>
           </Flex>
           <Text fontSize="sm" color="gray.500" mt={1}>
             总迭代次数: <Text as="span" fontWeight="medium" color="gray.700">{iterationCount}</Text>
@@ -177,7 +175,7 @@ export function OptimizationHeader({
             p={6}
             position="relative"
           >
-            <Heading as="h4" size="md" mb={4}>高级模型设置</Heading>
+            <Heading as="h4" size="md" mb={4}>设置</Heading>
             <Box position="absolute" top="10px" right="10px" cursor="pointer" onClick={onClose}>
               ✕
             </Box>
