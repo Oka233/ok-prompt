@@ -1,10 +1,10 @@
-import { callOpenAI } from './openai';
 import { 
   generateEvaluationPrompt, 
   generateSummaryPrompt, 
   generateOptimizationPrompt 
 } from '@/utils/promptTemplates';
 import { TestCase, TestMode } from '@/types/optimization';
+import { ModelProvider, ModelMessage } from '@/types/model';
 
 export interface InputTestResult {
   input: string;
@@ -58,15 +58,11 @@ export interface EvaluationSummary {
 export async function executeTests({
   prompt,
   testCases,
-  apiKey,
-  baseUrl,
   model,
 }: {
   prompt: string;
   testCases: TestCase[];
-  apiKey: string;
-  baseUrl?: string;
-  model: string;
+  model: ModelProvider;
 }): Promise<TestResult[]> {
   const results: TestResult[] = [];
 
@@ -75,19 +71,13 @@ export async function executeTests({
     
     // 构建输入
     const fullInput = `${prompt}\n\n输入文本：\n${testCase.input}\n\n提取结果：`;
+    const messages: ModelMessage[] = [{ role: 'user', content: fullInput }];
     
     try {
       // 调用目标LLM
-      const response = await callOpenAI({
-        apiKey,
-        baseUrl,
-        model,
-        messages: [
-          { role: 'user', content: fullInput }
-        ],
-      });
+      const response = await model.generateCompletion(messages);
       
-      const actualOutput = response.content || '';
+      const actualOutput = response.content;
       
       // 记录结果
       results.push({
@@ -134,16 +124,12 @@ export async function evaluateResults({
   prompt,
   testResults,
   testMode,
-  apiKey,
-  baseUrl,
   model,
 }: {
   prompt: string;
   testResults: InputTestResult[];
   testMode: TestMode;
-  apiKey: string;
-  baseUrl?: string;
-  model: string;
+  model: ModelProvider;
 }): Promise<EvaluationResult[]> {
   const evaluatedResults = [];
   
@@ -174,16 +160,10 @@ export async function evaluateResults({
       );
       
       // 调用评估LLM
-      const response = await callOpenAI({
-        apiKey,
-        baseUrl,
-        model,
-        messages: [
-          { role: 'user', content: evaluationPrompt }
-        ],
-      });
+      const messages: ModelMessage[] = [{ role: 'user', content: evaluationPrompt }];
+      const response = await model.generateCompletion(messages);
       
-      const evalResponse = response.content || '';
+      const evalResponse = response.content;
       
       // 解析评分和评估理由
       const { score, reasoning } = parseEvaluationResponse(evalResponse);
@@ -263,20 +243,18 @@ export async function summarizeEvaluation({
   prompt,
   testResults,
   testMode,
-  apiKey,
-  baseUrl,
   model,
+  onProgress,
 }: {
   prompt: string;
   testResults: InputTestResult[];
   testMode: TestMode;
-  apiKey: string;
-  baseUrl?: string;
-  model: string;
+  model: ModelProvider;
+  onProgress?: (partialSummary: string) => void;
 }): Promise<EvaluationSummary> {
   // 计算统计数据
   const totalCases = testResults.length;
-  const scores = testResults.map(res => res.score);
+  const scores = testResults.map(res => res.score || 0); // 处理null值
   const avgScore = scores.reduce((sum, score) => sum + score, 0) / totalCases;
   const perfectScores = scores.filter(score => score === 5).length;
   
@@ -293,32 +271,62 @@ export async function summarizeEvaluation({
         input: res.input,
         expectedOutput: res.expectedOutput,
         actualOutput: res.actualOutput,
-        score: res.score,
-        reasoning: res.comment
+        score: res.score || 0, // 处理null值
+        reasoning: res.comment || '' // 处理null值
       }))
     );
     
-    // 调用评估LLM获取总结
-    const response = await callOpenAI({
-      apiKey,
-      baseUrl,
-      model,
-      messages: [
-        { role: 'user', content: summaryPrompt }
-      ],
-    });
+    const messages = [{ role: 'user' as const, content: summaryPrompt }];
     
-    return {
-      avgScore,
-      perfectScoreCount: perfectScores,
-      totalCases,
-      summaryReport: response.content || '',
-      tokenUsage: {
-        promptTokens: response.usage.promptTokens,
-        completionTokens: response.usage.completionTokens,
-        totalTokens: response.usage.totalTokens,
-      }
-    };
+    // 如果提供了进度回调，使用流式API
+    if (onProgress) {
+      let fullContent = '';
+      let tokenUsage = {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      };
+      
+      // 使用流式API
+      await model.generateCompletionStream(
+        messages,
+        {
+          onContent: (chunk) => {
+            fullContent += chunk;
+            onProgress(fullContent);
+          },
+          onUsage: (usage) => {
+            tokenUsage = usage;
+          },
+          onComplete: (content) => {
+            // 完成时的处理（可选）
+          }
+        }
+      );
+      
+      return {
+        avgScore,
+        perfectScoreCount: perfectScores,
+        totalCases,
+        summaryReport: fullContent,
+        tokenUsage
+      };
+    } else {
+      // 使用非流式API
+      const response = await model.generateCompletion(messages);
+      
+      return {
+        avgScore,
+        perfectScoreCount: perfectScores,
+        totalCases,
+        summaryReport: response.content,
+        tokenUsage: {
+          promptTokens: response.usage.promptTokens,
+          completionTokens: response.usage.completionTokens,
+          totalTokens: response.usage.totalTokens,
+        }
+      };
+    }
     
   } catch (error) {
     console.error('生成评估总结时出错:', error);
@@ -346,18 +354,16 @@ export async function optimizePrompt({
   testResults,
   testMode,
   userFeedback,
-  apiKey,
-  baseUrl,
   model,
+  onProgress,
 }: {
   currentPrompt: string;
   evaluationSummary: string;
   testResults: InputTestResult[];
   testMode: TestMode;
   userFeedback?: string;
-  apiKey: string;
-  baseUrl?: string;
-  model: string;
+  model: ModelProvider;
+  onProgress?: (partialPrompt: string) => void;
 }): Promise<{
   newPrompt: string;
   tokenUsage: {
@@ -369,27 +375,27 @@ export async function optimizePrompt({
   try {
     // 获取表现较差的用例
     const lowScoringCases = testResults
-      .filter(result => result.score <= 4)
+      .filter(result => (result.score || 0) <= 4) // 处理null值
       .map(result => ({
         input: result.input,
         expectedOutput: result.expectedOutput,
         actualOutput: result.actualOutput,
-        score: result.score,
-        reasoning: result.comment
+        score: result.score || 0, // 处理null值
+        reasoning: result.comment || '' // 处理null值
       }));
     
     // 如果没有低分用例但仍有用例未达到满分，添加一些代表性用例
-    if (lowScoringCases.length === 0 && testResults.some(result => result.score < 5)) {
+    if (lowScoringCases.length === 0 && testResults.some(result => (result.score || 0) < 5)) {
       testResults
-        .filter(result => result.score < 5)
+        .filter(result => (result.score || 0) < 5)
         .slice(0, 3)
         .forEach(result => {
           lowScoringCases.push({
             input: result.input,
             expectedOutput: result.expectedOutput,
             actualOutput: result.actualOutput,
-            score: result.score,
-            reasoning: result.comment
+            score: result.score || 0, // 处理null值
+            reasoning: result.comment || '' // 处理null值
           });
         });
     }
@@ -403,26 +409,53 @@ export async function optimizePrompt({
       userFeedback
     );
     
-    // 调用评估LLM优化提示词
-    const response = await callOpenAI({
-      apiKey,
-      baseUrl,
-      model,
-      messages: [
-        { role: 'user', content: optimizationPrompt }
-      ],
-    });
+    const messages = [{ role: 'user' as const, content: optimizationPrompt }];
     
-    const newPrompt = cleanOptimizedPrompt(response.content || '');
-    
-    return {
-      newPrompt,
-      tokenUsage: {
-        promptTokens: response.usage.promptTokens,
-        completionTokens: response.usage.completionTokens,
-        totalTokens: response.usage.totalTokens,
-      }
-    };
+    // 如果提供了进度回调，使用流式API
+    if (onProgress) {
+      let fullContent = '';
+      let tokenUsage = {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      };
+      
+      // 使用流式API
+      await model.generateCompletionStream(
+        messages,
+        {
+          onContent: (chunk) => {
+            fullContent += chunk;
+            const cleanedPartialPrompt = cleanOptimizedPrompt(fullContent);
+            onProgress(cleanedPartialPrompt);
+          },
+          onUsage: (usage) => {
+            tokenUsage = usage;
+          },
+          onComplete: (content) => {
+            // 完成时的处理（可选）
+          }
+        }
+      );
+      
+      return {
+        newPrompt: cleanOptimizedPrompt(fullContent),
+        tokenUsage
+      };
+    } else {
+      // 使用非流式API
+      const response = await model.generateCompletion(messages);
+      const newPrompt = cleanOptimizedPrompt(response.content);
+      
+      return {
+        newPrompt,
+        tokenUsage: {
+          promptTokens: response.usage.promptTokens,
+          completionTokens: response.usage.completionTokens,
+          totalTokens: response.usage.totalTokens,
+        }
+      };
+    }
     
   } catch (error) {
     console.error('优化提示词时出错:', error);

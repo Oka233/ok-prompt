@@ -9,6 +9,7 @@ import {
   InputTestResult
 } from '@/services/optimizer';
 import { toaster } from "@/components/ui/toaster";
+import { ModelFactory } from '@/services/models/model-factory';
 
 // 添加视图状态类型
 export type ViewState = 'upload' | 'task_view' | 'model_management';
@@ -57,6 +58,7 @@ interface OptimizationState {
   importTask: (taskData: string) => Promise<void>;
 
   submitUserFeedback: (taskId: string, iterationId: string, feedback: string) => Promise<void>;
+  closeSummary: (taskId: string, iterationId: string) => void;
 }
 
 // 创建存储
@@ -213,6 +215,10 @@ export const useOptimizationStore = create<OptimizationState>()(
             throw new Error('请先配置目标模型和优化模型');
           }
 
+          // 创建模型实例
+          const targetModelInstance = ModelFactory.createModel(targetModel);
+          const optimizationModelInstance = ModelFactory.createModel(optimizationModel);
+
           // 更新任务状态为进行中
           set(state => ({
             tasks: state.tasks.map(t => 
@@ -305,15 +311,66 @@ export const useOptimizationStore = create<OptimizationState>()(
                   score: tc.iterationResults[currentIteration - 1].score,
                   comment: tc.iterationResults[currentIteration - 1].comment,
                 }));
+
+                // 创建一个临时提示词，用于流式更新
+                set(state => {
+                  const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                  const updatedIterations = t.promptIterations.map(((iteration, index) => {
+                    if (index === currentIteration) {
+                      return {
+                        ...iteration,
+                        prompt: '...',
+                        stage: 'generated' as const,
+                      };
+                    }
+                    return iteration;
+                  }));
+                  return {
+                    tasks: state.tasks.map(t =>
+                      t.id === taskId
+                        ? {
+                          ...t,
+                          promptIterations: updatedIterations,
+                          updatedAt: new Date().toISOString()
+                        }
+                        : t
+                    )
+                  };
+                });
+
                 const optimizationResult = await optimizePrompt({
                   currentPrompt: previousIteration.prompt,
                   evaluationSummary: previousIteration.reportSummary,
                   testResults: evaluatedResults,
                   testMode: task.testSet.mode,
                   userFeedback: previousIteration?.userFeedback,
-                  apiKey: optimizationModel.apiKey,
-                  baseUrl: optimizationModel.baseUrl,
-                  model: optimizationModel.name,
+                  model: optimizationModelInstance,
+                  onProgress: (partialPrompt) => {
+                    // 流式更新提示词
+                    set(state => {
+                      const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                      const updatedIterations = t.promptIterations.map(((iteration, index) => {
+                        if (index === currentIteration) {
+                          return {
+                            ...iteration,
+                            prompt: partialPrompt,
+                          };
+                        }
+                        return iteration;
+                      }));
+                      return {
+                        tasks: state.tasks.map(t =>
+                          t.id === taskId
+                            ? {
+                              ...t,
+                              promptIterations: updatedIterations,
+                              updatedAt: new Date().toISOString()
+                            }
+                            : t
+                        )
+                      };
+                    });
+                  }
                 });
 
                 currentPrompt = optimizationResult.newPrompt;
@@ -375,9 +432,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 const rawTestResults = await executeTests({
                   prompt: currentPrompt,
                   testCases: task.testSet.data,
-                  apiKey: targetModel.apiKey,
-                  baseUrl: targetModel.baseUrl,
-                  model: targetModel.name,
+                  model: targetModelInstance,
                 });
 
                 testResults = rawTestResults.map((result, index) => ({
@@ -448,7 +503,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 testResults.forEach((result, index) => {
                     if (task.testCases[index]) {
                         task.testCases[index].iterationResults[currentIteration].score = result.score;
-                        task.testCases[index].iterationResults[currentIteration].comment = result.comment;
+                        task.testCases[index].iterationResults[currentIteration].comment = result.comment || '';
                     }
                 });
               } else {
@@ -461,9 +516,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                   prompt: currentPrompt,
                   testResults,
                   testMode: task.testSet.mode,
-                  apiKey: optimizationModel.apiKey,
-                  baseUrl: optimizationModel.baseUrl,
-                  model: optimizationModel.name,
+                  model: optimizationModelInstance,
                 });
 
                 evaluatedResults.forEach((result, index) => {
@@ -529,13 +582,68 @@ export const useOptimizationStore = create<OptimizationState>()(
                 description: `正在总结评估结果`,
               });
               console.log('总结评估...');
+              
+              // 创建一个初始的报告状态
+              set(state => {
+                const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                // 更新迭代记录的初始状态
+                const updatedIterations = t.promptIterations.map(iteration => {
+                  if (iteration.iteration === currentIteration) {
+                    return {
+                      ...iteration,
+                      reportSummary: '...',
+                      stage: 'summarized' as const,
+                      showReport: true // 添加一个标记，表示应该自动展开报告
+                    };
+                  }
+                  return iteration;
+                });
+
+                return {
+                  tasks: state.tasks.map(t =>
+                      t.id === taskId
+                          ? {
+                            ...t,
+                            promptIterations: updatedIterations,
+                            updatedAt: new Date().toISOString()
+                          }
+                          : t
+                  )
+                };
+              });
+              
               const summary = await summarizeEvaluation({
                 prompt: currentPrompt,
                 testResults: testResults,
                 testMode: task.testSet.mode,
-                apiKey: optimizationModel.apiKey,
-                baseUrl: optimizationModel.baseUrl,
-                model: optimizationModel.name,
+                model: optimizationModelInstance,
+                onProgress: (partialSummary) => {
+                  // 流式更新评估总结
+                  set(state => {
+                    const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                    const updatedIterations = t.promptIterations.map(iteration => {
+                      if (iteration.iteration === currentIteration) {
+                        return {
+                          ...iteration,
+                          reportSummary: partialSummary,
+                        };
+                      }
+                      return iteration;
+                    });
+
+                    return {
+                      tasks: state.tasks.map(t =>
+                          t.id === taskId
+                              ? {
+                                ...t,
+                                promptIterations: updatedIterations,
+                                updatedAt: new Date().toISOString()
+                              }
+                              : t
+                      )
+                    };
+                  });
+                }
               });
 
               // 检查是否全部满分
@@ -560,7 +668,8 @@ export const useOptimizationStore = create<OptimizationState>()(
                       avgScore: summary.avgScore,
                       reportSummary: summary.summaryReport,
                       stage: 'summarized' as const,
-                      waitingForFeedback: t.requireUserFeedback && !allPerfect
+                      waitingForFeedback: t.requireUserFeedback && !allPerfect,
+                      showReport: iteration.showReport // 保留showReport属性
                     };
                   }
                   return iteration;
@@ -784,6 +893,26 @@ export const useOptimizationStore = create<OptimizationState>()(
           set({ error: (error as Error).message });
           throw error;
         }
+      },
+      closeSummary: (taskId, iterationId) => {
+        set(state => ({
+          tasks: state.tasks.map(task => {
+            if (task.id === taskId) {
+              return {
+                ...task,
+                promptIterations: task.promptIterations.map(iter => {
+                  if (iter.id === iterationId) {
+                    return { ...iter, showReport: false };
+                  }
+                  return iter;
+                }),
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return task;
+          }),
+        }));
+        console.log(`Report for iteration ${iterationId} in task ${taskId} marked as interacted (showReport: false).`);
       }
     }),
     {

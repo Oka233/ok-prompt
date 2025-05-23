@@ -8,7 +8,7 @@ import {
   Spinner,
   Textarea
 } from '@chakra-ui/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BiChevronDown } from 'react-icons/bi'
 import { useCurrentPromptIterations } from '@/store/useOptimizationStore'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
@@ -16,14 +16,26 @@ import { useOptimizationStore } from '@/store/useOptimizationStore'
 export function PromptIterationList() {
   const currentPromptIterations = useCurrentPromptIterations()
   const currentTask = useOptimizationStore(state => state.tasks.find(t => t.id === state.currentTaskId))
-  const { submitUserFeedback, tasks, currentTaskId } = useOptimizationStore()
+  const { submitUserFeedback, tasks, currentTaskId, closeSummary } = useOptimizationStore()
   const [openReport, setOpenReport] = useState<string | null>(null)
   const [selectedIteration, setSelectedIteration] = useState<string | null>('0')
   const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({})
   
+  // 检查是否有需要自动展开的报告
+  useEffect(() => {
+    currentPromptIterations.forEach(iteration => {
+      if (iteration.showReport && openReport !== iteration.id) {
+        setOpenReport(iteration.id)
+      }
+    })
+  }, [currentPromptIterations, openReport])
+  
   const toggleReport = (id: string) => {
     if (openReport === id) {
       setOpenReport(null)
+      if (currentTask?.id) {
+        closeSummary(currentTask.id, id)
+      }
     } else {
       setOpenReport(id)
     }

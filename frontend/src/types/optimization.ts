@@ -48,6 +48,7 @@ export interface PromptIteration {
   reportSummary: string;
   waitingForFeedback: boolean;
   userFeedback?: string;
+  showReport?: boolean; // 控制是否自动展开报告
   stage: 'not_started' | 'generated' | 'tested' | 'evaluated' | 'summarized';
 }
 
