@@ -152,7 +152,7 @@ export function PromptIterationList() {
               )}
 
               {/* 用户反馈区域 */}
-              { (item?.userFeedback || (item.waitingForFeedback && item.stage) === 'evaluated') && (
+              { (item?.userFeedback || (item.waitingForFeedback && item.stage) === 'summarized') && (
                     <Box mt={3}>
                       <Text fontSize="xs" fontWeight="medium" mb={1}>用户反馈：</Text>
                       <Textarea
@@ -161,7 +161,6 @@ export function PromptIterationList() {
                         placeholder="请输入您的反馈..."
                         size="sm"
                         disabled={!!item.userFeedback}
-                        mb={2}
                       />
                       {!item.userFeedback && (
                         <Button

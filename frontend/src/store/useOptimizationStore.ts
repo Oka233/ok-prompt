@@ -579,6 +579,17 @@ export const useOptimizationStore = create<OptimizationState>()(
 
               // 如果全部满分或需要用户反馈，则结束迭代
               if (allPerfect || task.requireUserFeedback) {
+                set(state => ({
+                  tasks: state.tasks.map(t => 
+                    t.id === taskId 
+                      ? { 
+                          ...t, 
+                          status: 'paused',
+                          updatedAt: new Date().toISOString() 
+                        }
+                      : t
+                  )
+                }));
                 return;
               }
 
