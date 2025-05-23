@@ -71,7 +71,7 @@ export function PromptIterationList() {
     }
 
     const stage = item.stage;
-    const currentIteration = tasks.find(task => task.id === currentTaskId)?.details.promptIterations.find(iteration => iteration.id === item.id)
+    const currentIteration = tasks.find(task => task.id === currentTaskId)?.promptIterations.find(iteration => iteration.id === item.id)
 
     return (
       <Flex alignItems="center">

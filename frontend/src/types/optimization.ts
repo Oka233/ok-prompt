@@ -59,11 +59,8 @@ export interface OptimizationTask {
   targetModelId?: string; // 目标模型ID
   optimizationModelId?: string; // 优化模型ID
   requireUserFeedback: boolean; // 是否需要用户反馈
-
-  details: { // 内嵌的任务详情数据
-    testCases: TestCaseResult[]; // 使用统一后的 TestCaseResult
-    promptIterations: PromptIteration[]; // 使用统一后的 PromptIteration
-  };
+  testCases: TestCaseResult[]; // 使用统一后的 TestCaseResult
+  promptIterations: PromptIteration[]; // 使用统一后的 PromptIteration
 }
 
 // 定义优化迭代结果类型

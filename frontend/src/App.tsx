@@ -6,12 +6,7 @@ import { useOptimizationStore } from './store/useOptimizationStore'
 import { Toaster } from "@/components/ui/toaster"
 
 function App() {
-  const { initializeDemoData, tasks, currentTaskId, setViewState, selectTask } = useOptimizationStore()
-  
-  // 初始化演示数据
-  // useEffect(() => {
-  //   initializeDemoData()
-  // }, [initializeDemoData])
+  const { tasks, currentTaskId, setViewState, selectTask } = useOptimizationStore()
 
   // 页面加载时检查任务并设置默认视图
   useEffect(() => {

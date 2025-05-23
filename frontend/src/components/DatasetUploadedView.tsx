@@ -25,7 +25,7 @@ export function DatasetUploadedView() {
         datasetName={currentTask.datasetName}
         mode={currentTask.testSet.mode}
         status={getStatusText(currentTask.status)}
-        iterationCount={currentTask.details.promptIterations.length}
+        iterationCount={currentTask.promptIterations.length}
       />
 
       <Flex 
@@ -84,4 +84,4 @@ function getStatusText(status: string): string {
     default:
       return '未开始';
   }
-} 
+}

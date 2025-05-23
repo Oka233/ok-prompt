@@ -55,9 +55,6 @@ interface OptimizationState {
   // 高级操作 (占位)
   exportTask: (taskId: string) => Promise<string>;
   importTask: (taskData: string) => Promise<void>;
-  
-  // 初始化假数据（仅用于演示）
-  initializeDemoData: () => void;
 
   submitUserFeedback: (taskId: string, iterationId: string, feedback: string) => Promise<void>;
 }
@@ -114,10 +111,8 @@ export const useOptimizationStore = create<OptimizationState>()(
             targetModelId,
             optimizationModelId,
             requireUserFeedback,
-            details: {
-              testCases: initialTestCases,
-              promptIterations: [initialPromptIteration]
-            }
+            testCases: initialTestCases,
+            promptIterations: [initialPromptIteration]
           };
           
           set(state => ({ 
@@ -227,12 +222,12 @@ export const useOptimizationStore = create<OptimizationState>()(
             )
           }));
 
-          if (task.details.promptIterations.length === 0) {
+          if (task.promptIterations.length === 0) {
             throw new Error('没有可用的提示词迭代记录');
           }
 
           // 检查是否达到最大迭代次数
-          if (task.details.promptIterations.length >= task.maxIterations && task.details.promptIterations[task.details.promptIterations.length - 1].stage === 'evaluated') {
+          if (task.promptIterations.length >= task.maxIterations && task.promptIterations[task.promptIterations.length - 1].stage === 'evaluated') {
             set(state => ({
               tasks: state.tasks.map(t =>
                   t.id === taskId
@@ -247,11 +242,11 @@ export const useOptimizationStore = create<OptimizationState>()(
             try {
               let task = get().tasks.find(t => t.id === taskId) as OptimizationTask;
 
-              const latestIteration = task.details.promptIterations[task.details.promptIterations.length - 1];
+              const latestIteration = task.promptIterations[task.promptIterations.length - 1];
 
               console.log("最新迭代:", latestIteration);
 
-              const currentIteration = latestIteration.stage !== 'summarized' ? task.details.promptIterations.length - 1 : task.details.promptIterations.length;
+              const currentIteration = latestIteration.stage !== 'summarized' ? task.promptIterations.length - 1 : task.promptIterations.length;
 
               const currentPromptIteration = latestIteration.stage !== 'summarized' ? latestIteration : {
                 id: crypto.randomUUID(),
@@ -269,10 +264,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                     t.id === taskId
                       ? {
                         ...t,
-                        details: {
-                          ...t.details,
-                          promptIterations: [...t.details.promptIterations, currentPromptIteration]
-                        },
+                        promptIterations: [...t.promptIterations, currentPromptIteration],
                         updatedAt: new Date().toISOString()
                       }
                       : t
@@ -295,14 +287,14 @@ export const useOptimizationStore = create<OptimizationState>()(
               }
 
               task = get().tasks.find(t => t.id === taskId) as OptimizationTask;
-              const previousIteration = task.details.promptIterations[task.details.promptIterations.length - 2];
+              const previousIteration = task.promptIterations[task.promptIterations.length - 2];
 
               let currentPrompt = currentPromptIteration.prompt;
               if (!currentPromptIteration.prompt) {
                 toaster.update(toasterId as string, {
                   description: `正在生成提示词`,
                 });
-                const evaluatedResults = task.details.testCases.map(tc => ({
+                const evaluatedResults = task.testCases.map(tc => ({
                   input: tc.input,
                   actualOutput: tc.iterationResults[currentIteration - 1].output,
                   expectedOutput: tc.expectedOutput,
@@ -325,7 +317,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                   const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
 
                   // 更新迭代记录的最终状态
-                  const updatedIterations = t.details.promptIterations.map(((iteration, index) => {
+                  const updatedIterations = t.promptIterations.map(((iteration, index) => {
                     if (index === currentIteration) {
                       return {
                         ...iteration,
@@ -340,10 +332,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                       t.id === taskId
                         ? {
                           ...t,
-                          details: {
-                            ...t.details,
-                            promptIterations: updatedIterations
-                          },
+                          promptIterations: updatedIterations,
                           updatedAt: new Date().toISOString()
                         }
                         : t
@@ -353,14 +342,14 @@ export const useOptimizationStore = create<OptimizationState>()(
               }
 
               let isTested = true;
-              task.details.testCases.forEach(tc => {
+              task.testCases.forEach(tc => {
                 if (tc.iterationResults.length <= currentIteration) {
                   isTested = false;
                 }
               });
               let testResults: InputTestResult[];
               if (isTested) {
-                testResults = task.details.testCases.map(tc => ({
+                testResults = task.testCases.map(tc => ({
                     input: tc.input,
                     expectedOutput: tc.expectedOutput,
                     actualOutput: tc.iterationResults[currentIteration].output,
@@ -390,7 +379,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 // 更新测试阶段和测试结果
                 set(state => {
                   const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
-                  const updatedTestCases = [...t.details.testCases];
+                  const updatedTestCases = [...t.testCases];
                   rawTestResults.forEach((result, index) => {
                     if (updatedTestCases[index]) {
                       updatedTestCases[index].iterationResults.push({
@@ -407,15 +396,12 @@ export const useOptimizationStore = create<OptimizationState>()(
                         t.id === taskId
                             ? {
                               ...t,
-                              details: {
-                                ...t.details,
-                                testCases: updatedTestCases,
-                                promptIterations: t.details.promptIterations.map(pi =>
-                                    pi.iteration === currentIteration
-                                        ? { ...pi, stage: 'tested' }
-                                        : pi
-                                )
-                              },
+                              testCases: updatedTestCases,
+                              promptIterations: t.promptIterations.map(pi =>
+                                  pi.iteration === currentIteration
+                                      ? { ...pi, stage: 'tested' }
+                                      : pi
+                              ),
                               updatedAt: new Date().toISOString()
                             }
                             : t
@@ -425,16 +411,16 @@ export const useOptimizationStore = create<OptimizationState>()(
               }
 
               let isEvaluated = true;
-              task.details.testCases.forEach(tc => {
+              task.testCases.forEach(tc => {
                 if (tc.iterationResults[currentIteration].score === null) {
                   isEvaluated = false;
                 }
               });
               if (isEvaluated) {
                 testResults.forEach((result, index) => {
-                    if (task.details.testCases[index]) {
-                        task.details.testCases[index].iterationResults[currentIteration].score = result.score;
-                        task.details.testCases[index].iterationResults[currentIteration].comment = result.comment;
+                    if (task.testCases[index]) {
+                        task.testCases[index].iterationResults[currentIteration].score = result.score;
+                        task.testCases[index].iterationResults[currentIteration].comment = result.comment;
                     }
                 });
               } else {
@@ -462,7 +448,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 // 更新评估阶段和评估结果
                 set(state => {
                   const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
-                  const updatedTestCases = [...t.details.testCases];
+                  const updatedTestCases = [...t.testCases];
                   evaluatedResults.forEach((result, index) => {
                     if (updatedTestCases[index]) {
                       const lastResult = updatedTestCases[index].iterationResults[updatedTestCases[index].iterationResults.length - 1];
@@ -480,15 +466,12 @@ export const useOptimizationStore = create<OptimizationState>()(
                         t.id === taskId
                             ? {
                               ...t,
-                              details: {
-                                ...t.details,
-                                testCases: updatedTestCases,
-                                promptIterations: t.details.promptIterations.map(pi =>
-                                    pi.iteration === currentIteration
-                                        ? { ...pi, stage: 'evaluated' }
-                                        : pi
-                                )
-                              },
+                              testCases: updatedTestCases,
+                              promptIterations: t.promptIterations.map(pi =>
+                                  pi.iteration === currentIteration
+                                      ? { ...pi, stage: 'evaluated' }
+                                      : pi
+                              ),
                               updatedAt: new Date().toISOString()
                             }
                             : t
@@ -534,7 +517,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
 
                 // 更新迭代记录的最终状态
-                const updatedIterations = t.details.promptIterations.map(iteration => {
+                const updatedIterations = t.promptIterations.map(iteration => {
                   if (iteration.iteration === currentIteration) {
                     return {
                       ...iteration,
@@ -552,10 +535,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                       t.id === taskId
                           ? {
                             ...t,
-                            details: {
-                              ...t.details,
-                              promptIterations: updatedIterations
-                            },
+                            promptIterations: updatedIterations,
                             updatedAt: new Date().toISOString()
                           }
                           : t
@@ -737,136 +717,6 @@ export const useOptimizationStore = create<OptimizationState>()(
         }));
         console.log(`已更新任务 ${taskId} 的用户反馈设置: ${requireUserFeedback}`);
       },
-          
-      // 初始化假数据（仅用于演示）
-      initializeDemoData: () => {
-        // 为任务1创建详细数据
-        const task1PromptIterations_demo: PromptIteration[] = [
-          { id: 'p1-0', iteration: 0, prompt: '请从以下文本中提取产品名称和主要特点。', waitingForFeedback: false, avgScore: 3.5, reportSummary: '该提示词在多数情况下能提取名称，但特点提取不全，尤其对于复杂描述。平均分：3.5/5。', stage: 'evaluated' },
-          { id: 'p1-1', iteration: 1, prompt: '严格按照格式要求：产品名称：[名称]。产品特点：[特点1]，[特点2]。从文本中提取信息：...', waitingForFeedback: false, avgScore: 4.2, reportSummary: '格式要求有改善，特点提取更准确，但仍有少数长句特点遗漏。平均分：4.2/5。', stage: 'evaluated' },
-          { id: 'p1-2', iteration: 2, prompt: '请识别并列出产品名称及所有独特卖点。产品名称：[此处填写名称]。卖点：[卖点A]；[卖点B]；[卖点C]。输入文本：...', waitingForFeedback: false, avgScore: 4.9, reportSummary: '表现优异，所有测试用例均能准确提取信息并符合格式。平均分：4.9/5。', stage: 'evaluated' },
-          { id: 'p1-3', iteration: 3, prompt: '完美提取产品名称与所有核心卖点。格式：产品 - [名称]。核心卖点：[卖点1] | [卖点2] | [卖点3]。从以下内容提取：...', waitingForFeedback: false, avgScore: 5.0, reportSummary: '所有测试用例均达到满分标准。优化成功。', stage: 'evaluated' }
-        ];
-        const task1TestCases_demo: TestCaseResult[] = [
-          { id: 'tc1-1', index: 1, input: '全新智能手机X1，拥有超清屏幕和持久电池。', expectedOutput: '名称：智能手机X1；特点：超清屏幕，持久电池', iterationResults: [
-              { iteration: 0, output: 'X1，特点：屏幕好', score: 3, comment: '特点不全' },
-              { iteration: 1, output: '产品名称：智能手机X1。产品特点：超清屏幕。', score: 4, comment: '遗漏持久电池' },
-              { iteration: 2, output: '产品名称：智能手机X1。卖点：超清屏幕；持久电池。', score: 5, comment: '准确' },
-              { iteration: 3, output: '产品 - 智能手机X1。核心卖点：超清屏幕 | 持久电池。', score: 5, comment: '完美匹配' }
-          ]},
-          { id: 'tc1-2', index: 2, input: '这款笔记本电脑Pro版本，轻薄设计，性能强劲，适合专业人士。', expectedOutput: '提取型号、主要特性（轻薄、性能强）和目标用户', iterationResults: [
-              { iteration: 0, output: '笔记本Pro，轻。', score: 2, comment: '信息严重不足' },
-              { iteration: 1, output: '产品名称：笔记本电脑Pro。产品特点：轻薄设计。', score: 3, comment: '遗漏性能和用户' },
-              { iteration: 2, output: '产品名称：笔记本电脑Pro。卖点：轻薄设计；性能强劲；适合专业人士。', score: 5, comment: '准确完整' },
-              { iteration: 3, output: '产品 - 笔记本电脑Pro。核心卖点：轻薄设计 | 性能强劲 | 适合专业人士。', score: 5, comment: '完美匹配' }
-          ]},
-          { id: 'tc1-3', index: 3, input: '蓝牙耳机AirBuds，降噪效果一流，佩戴舒适，续航长达24小时。', expectedOutput: '名称：AirBuds；特点：降噪，舒适，24小时续航', iterationResults: [
-              { iteration: 0, output: 'AirBuds，降噪', score: 3, comment: '遗漏舒适和续航' },
-              { iteration: 1, output: '产品名称：蓝牙耳机AirBuds。产品特点：降噪效果一流。', score: 4, comment: '遗漏舒适和续航细节' },
-              { iteration: 2, output: '产品名称：蓝牙耳机AirBuds。卖点：降噪效果一流；佩戴舒适；续航长达24小时。', score: 5, comment: '准确' },
-              { iteration: 3, output: '产品 - 蓝牙耳机AirBuds。核心卖点：降噪效果一流 | 佩戴舒适 | 续航长达24小时。', score: 5, comment: '完美匹配' }
-          ]}
-        ];
-
-        // 为任务2创建详细数据
-        const task2PromptIterations_demo: PromptIteration[] = [
-          { id: 'p2-0', iteration: 0, waitingForFeedback: false, prompt: '从邮件正文中提取主题行', avgScore: 2.8, reportSummary: '提取效果较差，无法识别各种格式的主题行。平均分：2.8/5。', stage: 'evaluated' },
-          { id: 'p2-1', iteration: 1, waitingForFeedback: false, prompt: '从邮件正文中查找"主题："或"Subject:"后的内容，提取为主题行。', avgScore: 3.5, reportSummary: '能识别明确标记的主题，但对隐含主题识别不足。平均分：3.5/5。', stage: 'evaluated' },
-          { id: 'p2-2', iteration: 2, waitingForFeedback: false, prompt: '分析邮件内容，提取主题行。如有明确标记如"主题："则直接提取；否则从首段提取主要话题作为主题。', avgScore: 4.2, reportSummary: '提取效果显著提升，能处理大部分情况。平均分：4.2/5。', stage: 'evaluated' },
-          { id: 'p2-3', iteration: 3, waitingForFeedback: false, prompt: '提取电子邮件的主题行，格式为"主题: [内容]"。优先查找明确标记的主题；若无标记，则从首段提取关键内容；对于会议邀请，提取会议名称和时间。', avgScore: 4.7, reportSummary: '提取准确度高，能处理多种邮件格式。平均分：4.7/5。', stage: 'evaluated' }
-        ];
-        const task2TestCases_demo: TestCaseResult[] = [
-          { id: 'tc2-1', index: 1, input: '主题：周五团队会议\n\n各位好，\n\n本周五下午3点将举行团队周会，请准时参加。', expectedOutput: '主题: 周五团队会议', iterationResults: [
-              { iteration: 0, output: '周五团队会议，请准时参加', score: 3, comment: '包含了非主题内容' },
-              { iteration: 1, output: '主题: 周五团队会议', score: 5, comment: '准确提取' },
-              { iteration: 2, output: '主题: 周五团队会议', score: 5, comment: '准确提取' },
-              { iteration: 3, output: '主题: 周五团队会议', score: 5, comment: '准确提取' }
-          ]},
-          { id: 'tc2-2', index: 2, input: '各位同事：\n\n关于下周产品发布会的准备工作，请各部门于周三前提交相关材料。\n\n谢谢！', expectedOutput: '主题: 下周产品发布会准备工作', iterationResults: [
-              { iteration: 0, output: '关于下周产品发布会的准备工作', score: 4, comment: '内容基本正确但格式不符' },
-              { iteration: 1, output: '无法找到主题行', score: 1, comment: '未能识别隐含主题' },
-              { iteration: 2, output: '主题: 下周产品发布会的准备工作', score: 5, comment: '准确提取' },
-              { iteration: 3, output: '主题: 下周产品发布会的准备工作', score: 5, comment: '准确提取' }
-          ]}
-        ];
-
-        // 为任务3创建详细数据
-        const task3PromptIterations_demo: PromptIteration[] = [
-          { id: 'p3-0', iteration: 0, waitingForFeedback: false, prompt: '从文本中提取人名', avgScore: 2.5, reportSummary: '提取不完整，无法识别复杂名称格式。平均分：2.5/5。', stage: 'evaluated' },
-          { id: 'p3-1', iteration: 1, waitingForFeedback: false, prompt: '从文本中提取所有人名，包括中文名和英文名。', avgScore: 3.2, reportSummary: '能识别基本人名，但是对于带头衔或特殊格式的名字识别不足。平均分：3.2/5。', stage: 'evaluated' },
-          { id: 'p3-2', iteration: 2, waitingForFeedback: false, prompt: '从文本中识别并提取所有人名。识别中文名（如张三、李四）、英文名（如John Smith）、带头衔的名字（如张教授、Dr. Johnson）。', avgScore: 4.0, reportSummary: '提取效果明显改善，但对某些复杂情况仍有遗漏。平均分：4.0/5。', stage: 'evaluated' }
-        ];
-        const task3TestCases_demo: TestCaseResult[] = [
-          { id: 'tc3-1', index: 1, input: '会议由张教授主持，李明和王芳将做报告。', expectedOutput: '姓名: 张教授, 李明, 王芳', iterationResults: [
-              { iteration: 0, output: '李明, 王芳', score: 3, comment: '遗漏带头衔的名字' },
-              { iteration: 1, output: '张, 李明, 王芳', score: 3, comment: '未正确识别头衔' },
-              { iteration: 2, output: '姓名: 张教授, 李明, 王芳', score: 5, comment: '准确提取' }
-          ]}
-        ];
-        
-        // 初始化任务数据，并将详细数据嵌入
-        const demoTasks: OptimizationTask[] = [
-          {
-            id: '1',
-            name: '优化任务 2024-05-15',
-            datasetName: 'product_descriptions_v2.json',
-            testSet: { mode: 'descriptive', data: [] }, // 简化 testSet, 实际应从 taskXTestCases_demo 反向构造或保持一致
-            maxIterations: 10,
-            status: 'completed',
-            totalTokensUsed: 12500,
-            createdAt: '2024-05-15T10:00:00Z',
-            updatedAt: '2024-05-15T11:30:00Z',
-            requireUserFeedback: false,
-            details: {
-              testCases: task1TestCases_demo,
-              promptIterations: task1PromptIterations_demo
-            }
-          },
-          {
-            id: '2',
-            name: '优化任务 2024-05-12',
-            datasetName: 'email_subject.json',
-            testSet: { mode: 'strict', data: [] },
-            maxIterations: 10,
-            status: 'in_progress',
-            totalTokensUsed: 8200,
-            createdAt: '2024-05-12T14:00:00Z',
-            updatedAt: '2024-05-12T15:45:00Z',
-            requireUserFeedback: false,
-            details: {
-              testCases: task2TestCases_demo,
-              promptIterations: task2PromptIterations_demo
-            }
-          },
-          {
-            id: '3',
-            name: '优化任务 2024-05-10',
-            datasetName: 'name_extraction.json',
-            testSet: { mode: 'strict', data: [] },
-            maxIterations: 10,
-            status: 'max_iterations_reached',
-            totalTokensUsed: 18900,
-            createdAt: '2024-05-10T09:00:00Z',
-            updatedAt: '2024-05-10T11:20:00Z',
-            requireUserFeedback: false,
-            details: {
-              testCases: task3TestCases_demo,
-              promptIterations: task3PromptIterations_demo
-            }
-          }
-        ];
-        
-        // 默认选择第一个任务
-        const defaultTask = demoTasks.find(task => task.id === '1');
-        
-        set({
-          tasks: demoTasks,
-          currentTaskId: defaultTask ? defaultTask.id : null,
-          viewState: defaultTask ? 'task_view' : 'upload'
-        });
-        
-        console.log('已初始化演示数据，任务详情已内嵌。');
-      },
 
       submitUserFeedback: async (taskId: string, iterationId: string, feedback: string) => {
         set({ error: null });
@@ -876,19 +726,16 @@ export const useOptimizationStore = create<OptimizationState>()(
               if (task.id === taskId) {
                 return {
                   ...task,
-                  details: {
-                    ...task.details,
-                    promptIterations: task.details.promptIterations.map(iteration => {
-                      if (iteration.id === iterationId) {
-                        return {
-                          ...iteration,
-                          userFeedback: feedback,
-                          waitingForFeedback: false
-                        };
-                      }
-                      return iteration;
-                    })
-                  },
+                  promptIterations: task.promptIterations.map(iteration => {
+                    if (iteration.id === iterationId) {
+                      return {
+                        ...iteration,
+                        userFeedback: feedback,
+                        waitingForFeedback: false
+                      };
+                    }
+                    return iteration;
+                  }),
                   updatedAt: new Date().toISOString()
                 };
               }
@@ -918,12 +765,12 @@ export const useCurrentTestCases = () => useOptimizationStore(state => {
   const currentTaskId = state.currentTaskId;
   if (!currentTaskId) return [];
   const task = state.tasks.find(t => t.id === currentTaskId);
-  return task?.details.testCases || [];
+  return task?.testCases || [];
 });
 
 export const useCurrentPromptIterations = () => useOptimizationStore(state => {
   const currentTaskId = state.currentTaskId;
   if (!currentTaskId) return [];
   const task = state.tasks.find(t => t.id === currentTaskId);
-  return task?.details.promptIterations || [];
+  return task?.promptIterations || [];
 });
