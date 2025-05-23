@@ -196,10 +196,10 @@ export function OptimizationHeader({
               总迭代次数: <Text as="span" fontWeight="medium" color="gray.700">{iterationCount}</Text>
             </Text>
             <Text fontSize="sm" color="gray.500">
-              输入Token: <Text as="span" fontWeight="medium" color="gray.700">{currentTask?.totalTokensUsed || 0}</Text>
+              输入Token: <Text as="span" fontWeight="medium" color="gray.700">{currentTask?.tokenUsage?.promptTokens || 0}</Text>
             </Text>
             <Text fontSize="sm" color="gray.500">
-              输出Token: <Text as="span" fontWeight="medium" color="gray.700">{currentTask?.totalTokensUsed || 0}</Text>
+              输出Token: <Text as="span" fontWeight="medium" color="gray.700">{currentTask?.tokenUsage?.completionTokens || 0}</Text>
             </Text>
           </Flex>
         </Box>

@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import { estimateMessagesTokens } from '@/utils/tokenCounter';
 
 // 定义消息类型
 type ChatMessage = {
@@ -7,9 +6,6 @@ type ChatMessage = {
   content: string;
   name?: string;
 };
-
-// 默认模型
-const DEFAULT_MODEL = 'gpt-3.5-turbo';
 
 // OpenAI客户端实例缓存
 const clientCache = new Map<string, OpenAI>();
@@ -19,7 +15,7 @@ const clientCache = new Map<string, OpenAI>();
  */
 function getClient(apiKey: string, baseUrl?: string): OpenAI {
   // 创建缓存键
-  const cacheKey = `${apiKey}:${baseUrl || 'default'}`;
+  const cacheKey = `${apiKey}:${baseUrl}`;
   
   // 检查缓存中是否已有实例
   if (clientCache.has(cacheKey)) {
@@ -45,23 +41,20 @@ function getClient(apiKey: string, baseUrl?: string): OpenAI {
 export async function callOpenAI({
   apiKey,
   baseUrl,
-  model = DEFAULT_MODEL,
+  model,
   messages,
   temperature = 0.7,
   maxTokens,
 }: {
   apiKey: string;
-  baseUrl?: string;
-  model?: string;
+  baseUrl: string;
+  model: string;
   messages: ChatMessage[];
   temperature?: number;
   maxTokens?: number;
 }) {
   try {
     const client = getClient(apiKey, baseUrl);
-    
-    // 估算已使用的token数量
-    const estimatedTokens = estimateMessagesTokens(messages);
     
     const response = await client.chat.completions.create({
       model,
@@ -71,9 +64,12 @@ export async function callOpenAI({
     });
     
     // 提取使用的token信息
-    const promptTokens = response.usage?.prompt_tokens || estimatedTokens;
+    const promptTokens = response.usage?.prompt_tokens || 0;
     const completionTokens = response.usage?.completion_tokens || 0;
-    const totalTokens = response.usage?.total_tokens || (promptTokens + completionTokens);
+    const totalTokens = response.usage?.total_tokens || 0;
+
+    console.log(response)
+    console.log(promptTokens, completionTokens, totalTokens)
     
     return {
       content: response.choices[0].message.content,
@@ -95,25 +91,22 @@ export async function callOpenAI({
 export async function callOpenAIStream({
   apiKey,
   baseUrl,
-  model = DEFAULT_MODEL,
+  model,
   messages,
   temperature = 0.7,
   maxTokens,
   onUpdate,
 }: {
   apiKey: string;
-  baseUrl?: string;
-  model?: string;
+  baseUrl: string;
+  model: string;
   messages: ChatMessage[];
   temperature?: number;
   maxTokens?: number;
-  onUpdate: (chunk: string) => void;
+  onUpdate: (chunk: string, usage?: { promptTokens: number; completionTokens: number; totalTokens: number }) => void;
 }) {
   try {
     const client = getClient(apiKey, baseUrl);
-    
-    // 估算已使用的token数量
-    const estimatedPromptTokens = estimateMessagesTokens(messages);
     
     const stream = await client.chat.completions.create({
       model,
@@ -121,27 +114,36 @@ export async function callOpenAIStream({
       temperature,
       max_tokens: maxTokens,
       stream: true,
+      stream_options: { include_usage: true },
     });
     
     let fullContent = '';
-    let completionTokens = 0;
     
     for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || '';
-      if (content) {
+      // 处理内容更新
+      if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0]?.delta?.content) {
+        const content = chunk.choices[0].delta.content;
         fullContent += content;
-        completionTokens += estimateMessagesTokens([{role: 'assistant', content}]);
         onUpdate(content);
+      }
+      
+      // 处理token用量信息（在最后一个chunk中）
+      if (chunk.usage) {
+        const usage = {
+          promptTokens: chunk.usage.prompt_tokens || 0,
+          completionTokens: chunk.usage.completion_tokens || 0,
+          totalTokens: chunk.usage.total_tokens || 0
+        };
+        onUpdate('', usage); // 传递空内容和用量信息
       }
     }
     
-    // 返回完整内容和估算的token使用情况
     return {
       content: fullContent,
       usage: {
-        promptTokens: estimatedPromptTokens,
-        completionTokens,
-        totalTokens: estimatedPromptTokens + completionTokens,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
       }
     };
   } catch (error) {

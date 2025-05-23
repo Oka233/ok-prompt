@@ -105,7 +105,11 @@ export const useOptimizationStore = create<OptimizationState>()(
             maxIterations,
             status: 'not_started',
             tokenBudget,
-            totalTokensUsed: 0,
+            tokenUsage: {
+              promptTokens: 0,
+              completionTokens: 0,
+              totalTokens: 0
+            },
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             targetModelId,
@@ -316,6 +320,13 @@ export const useOptimizationStore = create<OptimizationState>()(
                 set(state => {
                   const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
 
+                  // 更新token用量
+                  const updatedTokenUsage = {
+                    promptTokens: t.tokenUsage.promptTokens + optimizationResult.tokenUsage.promptTokens,
+                    completionTokens: t.tokenUsage.completionTokens + optimizationResult.tokenUsage.completionTokens,
+                    totalTokens: t.tokenUsage.totalTokens + optimizationResult.tokenUsage.totalTokens
+                  };
+
                   // 更新迭代记录的最终状态
                   const updatedIterations = t.promptIterations.map(((iteration, index) => {
                     if (index === currentIteration) {
@@ -332,6 +343,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                       t.id === taskId
                         ? {
                           ...t,
+                          tokenUsage: updatedTokenUsage,
                           promptIterations: updatedIterations,
                           updatedAt: new Date().toISOString()
                         }
@@ -380,6 +392,21 @@ export const useOptimizationStore = create<OptimizationState>()(
                 set(state => {
                   const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
                   const updatedTestCases = [...t.testCases];
+                  
+                  // 计算本次测试的token用量
+                  const testTokenUsage = rawTestResults.reduce((total, result) => ({
+                    promptTokens: total.promptTokens + (result.tokenUsage?.promptTokens || 0),
+                    completionTokens: total.completionTokens + (result.tokenUsage?.completionTokens || 0),
+                    totalTokens: total.totalTokens + (result.tokenUsage?.totalTokens || 0)
+                  }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+                  
+                  // 更新总token用量
+                  const updatedTokenUsage = {
+                    promptTokens: t.tokenUsage.promptTokens + testTokenUsage.promptTokens,
+                    completionTokens: t.tokenUsage.completionTokens + testTokenUsage.completionTokens,
+                    totalTokens: t.tokenUsage.totalTokens + testTokenUsage.totalTokens
+                  };
+                  
                   rawTestResults.forEach((result, index) => {
                     if (updatedTestCases[index]) {
                       updatedTestCases[index].iterationResults.push({
@@ -396,6 +423,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                         t.id === taskId
                             ? {
                               ...t,
+                              tokenUsage: updatedTokenUsage,
                               testCases: updatedTestCases,
                               promptIterations: t.promptIterations.map(pi =>
                                   pi.iteration === currentIteration
@@ -440,7 +468,7 @@ export const useOptimizationStore = create<OptimizationState>()(
 
                 evaluatedResults.forEach((result, index) => {
                   testResults[index].score = result.score;
-                  testResults[index].comment = result.comment;
+                  testResults[index].comment = result.comment || '';
                 });
 
                 console.log(evaluatedResults)
@@ -449,12 +477,27 @@ export const useOptimizationStore = create<OptimizationState>()(
                 set(state => {
                   const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
                   const updatedTestCases = [...t.testCases];
+                  
+                  // 计算本次评估的token用量
+                  const evaluationTokenUsage = evaluatedResults.reduce((total, result) => ({
+                    promptTokens: total.promptTokens + (result.tokenUsage?.promptTokens || 0),
+                    completionTokens: total.completionTokens + (result.tokenUsage?.completionTokens || 0),
+                    totalTokens: total.totalTokens + (result.tokenUsage?.totalTokens || 0)
+                  }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+                  
+                  // 更新总token用量
+                  const updatedTokenUsage = {
+                    promptTokens: t.tokenUsage.promptTokens + evaluationTokenUsage.promptTokens,
+                    completionTokens: t.tokenUsage.completionTokens + evaluationTokenUsage.completionTokens,
+                    totalTokens: t.tokenUsage.totalTokens + evaluationTokenUsage.totalTokens
+                  };
+                  
                   evaluatedResults.forEach((result, index) => {
                     if (updatedTestCases[index]) {
                       const lastResult = updatedTestCases[index].iterationResults[updatedTestCases[index].iterationResults.length - 1];
                       if (lastResult) {
                         lastResult.score = result.score;
-                        lastResult.comment = result.comment;
+                        lastResult.comment = result.comment || '';
                       }
                     }
                   });
@@ -466,6 +509,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                         t.id === taskId
                             ? {
                               ...t,
+                              tokenUsage: updatedTokenUsage,
                               testCases: updatedTestCases,
                               promptIterations: t.promptIterations.map(pi =>
                                   pi.iteration === currentIteration
@@ -494,27 +538,19 @@ export const useOptimizationStore = create<OptimizationState>()(
                 model: optimizationModel.name,
               });
 
-
-              // // 计算使用的token总数
-              // const iterationTokenUsage = evaluatedResults.reduce(
-              //     (total, result) => total + result.tokenUsage.totalTokens,
-              //     summary.tokenUsage.totalTokens
-              // );
-              //
-              // // 提取测试结果
-              // const processedTestResults = evaluatedResults.map(result => ({
-              //   testCaseIndex: result.index,
-              //   output: result.actualOutput,
-              //   score: result.score,
-              //   reasoning: result.reasoning,
-              // }));
-
               // 检查是否全部满分
               const allPerfect = summary.perfectScoreCount === summary.totalCases;
 
               // 更新优化阶段和最终结果
               set(state => {
                 const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+
+                // 更新token用量
+                const updatedTokenUsage = {
+                  promptTokens: t.tokenUsage.promptTokens + summary.tokenUsage.promptTokens,
+                  completionTokens: t.tokenUsage.completionTokens + summary.tokenUsage.completionTokens,
+                  totalTokens: t.tokenUsage.totalTokens + summary.tokenUsage.totalTokens
+                };
 
                 // 更新迭代记录的最终状态
                 const updatedIterations = t.promptIterations.map(iteration => {
@@ -535,6 +571,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                       t.id === taskId
                           ? {
                             ...t,
+                            tokenUsage: updatedTokenUsage,
                             promptIterations: updatedIterations,
                             updatedAt: new Date().toISOString()
                           }

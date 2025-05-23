@@ -20,6 +20,12 @@ export interface ModelConfig {
   updatedAt: string;
 }
 
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 // 与 useOptimizationStore.ts 中定义一致的类型，用于任务详情
 export interface TestCaseResult {
   id: string;
@@ -53,7 +59,7 @@ export interface OptimizationTask {
   maxIterations: number;
   status: 'not_started' | 'in_progress' | 'completed' | 'max_iterations_reached' | 'paused';
   tokenBudget?: number;
-  totalTokensUsed: number;
+  tokenUsage: TokenUsage;
   createdAt: string;
   updatedAt: string;
   targetModelId?: string; // 目标模型ID
