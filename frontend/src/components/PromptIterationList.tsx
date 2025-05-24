@@ -8,7 +8,7 @@ import {
   Spinner,
   Textarea
 } from '@chakra-ui/react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { BiChevronDown } from 'react-icons/bi'
 import { useCurrentPromptIterations } from '@/store/useOptimizationStore'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
@@ -16,28 +16,22 @@ import { useOptimizationStore } from '@/store/useOptimizationStore'
 export function PromptIterationList() {
   const currentPromptIterations = useCurrentPromptIterations()
   const currentTask = useOptimizationStore(state => state.tasks.find(t => t.id === state.currentTaskId))
-  const { submitUserFeedback, tasks, currentTaskId, closeSummary } = useOptimizationStore()
-  const [openReport, setOpenReport] = useState<string | null>(null)
+  const { submitUserFeedback, tasks, currentTaskId, closeSummary, showSummary } = useOptimizationStore()
   const [selectedIteration, setSelectedIteration] = useState<string | null>('0')
   const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({})
   
-  // 检查是否有需要自动展开的报告
-  useEffect(() => {
-    currentPromptIterations.forEach(iteration => {
-      if (iteration.showReport && openReport !== iteration.id) {
-        setOpenReport(iteration.id)
-      }
-    })
-  }, [currentPromptIterations, openReport])
-  
   const toggleReport = (id: string) => {
-    if (openReport === id) {
-      setOpenReport(null)
-      if (currentTask?.id) {
-        closeSummary(currentTask.id, id)
+    if (currentTask?.id) {
+      // 找到当前迭代
+      const iteration = currentPromptIterations.find(iter => iter.id === id);
+      
+      // 如果当前迭代已经打开，则关闭它
+      if (iteration?.showReport) {
+        closeSummary(currentTask.id, id);
+      } else {
+        // 否则打开当前报告
+        showSummary(currentTask.id, id);
       }
-    } else {
-      setOpenReport(id)
     }
     console.log(`切换显示迭代 ${id} 的评估报告`);
   }
@@ -70,8 +64,10 @@ export function PromptIterationList() {
   const getStageBadge = (item: any) => {
     const stageColors = {
       'not_started': 'gray',
+      'generated': 'blue',
       'tested': 'blue',
-      'evaluated': 'purple'
+      'evaluated': 'blue',
+      'summarized': 'blue',
     }
     
     const stageText = {
@@ -87,7 +83,7 @@ export function PromptIterationList() {
 
     return (
       <Flex alignItems="center">
-        <Badge colorScheme={stageColors[stage as keyof typeof stageColors]} ml={2}>
+        <Badge colorPalette={stageColors[stage as keyof typeof stageColors]} ml={2}>
           {stageText[stage as keyof typeof stageText]}
         </Badge>
         {currentTask?.status === 'in_progress' && item.iteration === currentIteration && (
@@ -120,7 +116,7 @@ export function PromptIterationList() {
           >
             <Flex alignItems="center">
               <Text fontWeight="semibold" color={item.id === selectedIteration ? "blue.700" : "gray.700"}>
-                {`优化提示词`} (Iteration {item.iteration})
+                {item.iteration === 0 ? `初始提示词` : `优化提示词`} - 迭代 {item.iteration}
               </Text>
               {getStageBadge(item)}
             </Flex>
@@ -149,7 +145,7 @@ export function PromptIterationList() {
                   <BiChevronDown 
                     size={16}
                     style={{
-                      transform: openReport === item.id ? 'rotate(180deg)' : undefined,
+                      transform: item.showReport ? 'rotate(180deg)' : undefined,
                       transition: 'transform 0.2s',
                       marginLeft: '4px'
                     }}
@@ -157,7 +153,7 @@ export function PromptIterationList() {
                 </Flex>
               </Button>
               
-              {openReport === item.id && (
+              {item.showReport && (
                 <Box mt={2} p={2} bg="gray.50" borderRadius="md" fontSize="xs" color="gray.600">
                   {item.reportSummary}
                 </Box>

@@ -9,7 +9,7 @@ import {
   IconButton,
 } from '@chakra-ui/react'
 import { Table } from '@chakra-ui/react'
-import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi'
+import { FiPlus, FiEdit2, FiTrash2, FiSave, FiXCircle } from 'react-icons/fi'
 import { useState, useRef } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 import { ModelConfig } from '@/types/optimization'
@@ -225,9 +225,13 @@ export function ModelManagement() {
             </Box>
 
             <Flex justifyContent="flex-end" gap={3}>
-              <Button onClick={onClose}>取消</Button>
-              <Button onClick={handleSubmit}>
-                保存
+              <Button size="sm" variant="outline" onClick={onClose}>
+                <FiXCircle />
+                取消
+              </Button>
+              <Button size="sm" onClick={handleSubmit}>
+                <FiSave />
+                添加
               </Button>
             </Flex>
           </Box>

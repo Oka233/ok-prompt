@@ -10,6 +10,7 @@ import {
 } from '@/services/optimizer';
 import { toaster } from "@/components/ui/toaster";
 import { ModelFactory } from '@/services/models/model-factory';
+import { OperationCancelledError } from '@/errors/OperationCancelledError';
 
 // 添加视图状态类型
 export type ViewState = 'upload' | 'task_view' | 'model_management';
@@ -59,6 +60,7 @@ interface OptimizationState {
 
   submitUserFeedback: (taskId: string, iterationId: string, feedback: string) => Promise<void>;
   closeSummary: (taskId: string, iterationId: string) => void;
+  showSummary: (taskId: string, iterationId: string) => void;
 }
 
 // 创建存储
@@ -250,7 +252,16 @@ export const useOptimizationStore = create<OptimizationState>()(
 
           const runIteration = async () => {
             try {
-              let task = get().tasks.find(t => t.id === taskId) as OptimizationTask;
+              // 在每次迭代开始时，重新获取最新的任务状态
+              const currentTask = get().tasks.find(t => t.id === taskId);
+              
+              // 检查任务是否已被暂停
+              if (!currentTask || currentTask.status === 'paused') {
+                console.log(`[runIteration] 任务 ${taskId} 已暂停，停止进一步迭代`);
+                return;
+              }
+              
+              let task = currentTask as OptimizationTask;
 
               const latestIteration = task.promptIterations[task.promptIterations.length - 1];
 
@@ -296,7 +307,13 @@ export const useOptimizationStore = create<OptimizationState>()(
                 })
               }
 
+              // 再次检查任务状态
               task = get().tasks.find(t => t.id === taskId) as OptimizationTask;
+              if (task.status === 'paused') {
+                console.log(`[runIteration] 任务 ${taskId} 在准备阶段被暂停，停止迭代`);
+                return;
+              }
+              
               const previousIteration = task.promptIterations[task.promptIterations.length - 2];
 
               let currentPrompt = currentPromptIteration.prompt;
@@ -320,7 +337,6 @@ export const useOptimizationStore = create<OptimizationState>()(
                       return {
                         ...iteration,
                         prompt: '...',
-                        stage: 'generated' as const,
                       };
                     }
                     return iteration;
@@ -370,7 +386,8 @@ export const useOptimizationStore = create<OptimizationState>()(
                         )
                       };
                     });
-                  }
+                  },
+                  isCancelled: () => get().tasks.find(t => t.id === taskId)?.status === 'paused',
                 });
 
                 currentPrompt = optimizationResult.newPrompt;
@@ -410,6 +427,13 @@ export const useOptimizationStore = create<OptimizationState>()(
                 });
               }
 
+              // 再次检查任务状态
+              task = get().tasks.find(t => t.id === taskId) as OptimizationTask;
+              if (task.status === 'paused') {
+                console.log(`[runIteration] 任务 ${taskId} 在生成提示词后被暂停，停止迭代`);
+                return;
+              }
+
               let isTested = true;
               task.testCases.forEach(tc => {
                 if (tc.iterationResults.length <= currentIteration) {
@@ -433,6 +457,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                   prompt: currentPrompt,
                   testCases: task.testSet.data,
                   model: targetModelInstance,
+                  isCancelled: () => get().tasks.find(t => t.id === taskId)?.status === 'paused',
                 });
 
                 testResults = rawTestResults.map((result, index) => ({
@@ -493,6 +518,13 @@ export const useOptimizationStore = create<OptimizationState>()(
                 });
               }
 
+              // 再次检查任务状态
+              task = get().tasks.find(t => t.id === taskId) as OptimizationTask;
+              if (task.status === 'paused') {
+                console.log(`[runIteration] 任务 ${taskId} 在测试阶段后被暂停，停止迭代`);
+                return;
+              }
+
               let isEvaluated = true;
               task.testCases.forEach(tc => {
                 if (tc.iterationResults[currentIteration].score === null) {
@@ -517,6 +549,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                   testResults,
                   testMode: task.testSet.mode,
                   model: optimizationModelInstance,
+                  isCancelled: () => get().tasks.find(t => t.id === taskId)?.status === 'paused',
                 });
 
                 evaluatedResults.forEach((result, index) => {
@@ -577,6 +610,12 @@ export const useOptimizationStore = create<OptimizationState>()(
                 });
               }
 
+              // 再次检查任务状态
+              task = get().tasks.find(t => t.id === taskId) as OptimizationTask;
+              if (task.status === 'paused') {
+                console.log(`[runIteration] 任务 ${taskId} 在评估阶段后被暂停，停止迭代`);
+                return;
+              }
 
               toaster.update(toasterId as string, {
                 description: `正在总结评估结果`,
@@ -592,8 +631,6 @@ export const useOptimizationStore = create<OptimizationState>()(
                     return {
                       ...iteration,
                       reportSummary: '...',
-                      stage: 'summarized' as const,
-                      showReport: true // 添加一个标记，表示应该自动展开报告
                     };
                   }
                   return iteration;
@@ -611,6 +648,12 @@ export const useOptimizationStore = create<OptimizationState>()(
                   )
                 };
               });
+              
+              // 显示当前迭代的报告
+              const currentIterationObj = get().tasks.find(t => t.id === taskId)?.promptIterations.find(pi => pi.iteration === currentIteration);
+              if (currentIterationObj) {
+                get().showSummary(taskId, currentIterationObj.id);
+              }
               
               const summary = await summarizeEvaluation({
                 prompt: currentPrompt,
@@ -643,7 +686,8 @@ export const useOptimizationStore = create<OptimizationState>()(
                       )
                     };
                   });
-                }
+                },
+                isCancelled: () => get().tasks.find(t => t.id === taskId)?.status === 'paused',
               });
 
               // 检查是否全部满分
@@ -689,12 +733,38 @@ export const useOptimizationStore = create<OptimizationState>()(
                 };
               });
 
+              // 如果全部满分，则结束迭代并将任务标记为已完成
+              if (allPerfect) {
+                console.log(`[runIteration] 任务 ${taskId} 已达到全部满分，标记为已完成`);
+                set(state => ({
+                  tasks: state.tasks.map(t => 
+                    t.id === taskId 
+                      ? { 
+                          ...t, 
+                          status: 'completed',
+                          updatedAt: new Date().toISOString() 
+                        }
+                      : t
+                  )
+                }));
+                return;
+              }
+
+              // 在决定是否继续迭代前，再次获取最新的任务状态
+              const updatedTask = get().tasks.find(t => t.id === taskId) as OptimizationTask;
+              
+              // 如果任务已被暂停，则不继续迭代
+              if (updatedTask.status === 'paused') {
+                console.log(`[runIteration] 任务 ${taskId} 在总结阶段后被暂停，停止迭代`);
+                return;
+              }
+
               // 更新任务状态
               set(state => {
                 const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
                 const updatedTask = {
                   ...t,
-                  status: allPerfect ? 'completed' : 'in_progress',
+                  status: 'in_progress',
                   updatedAt: new Date().toISOString(),
                 } as OptimizationTask;
                 
@@ -702,9 +772,10 @@ export const useOptimizationStore = create<OptimizationState>()(
                   tasks: state.tasks.map(task => task.id === taskId ? updatedTask : task),
                 };
               });
-
-              // 如果全部满分或需要用户反馈，则结束迭代
-              if (allPerfect || task.requireUserFeedback) {
+              
+              // 如果需要用户反馈，则暂停迭代
+              if (updatedTask.requireUserFeedback) {
+                console.log(`[runIteration] 任务 ${taskId} 需要用户反馈，暂停迭代`);
                 set(state => ({
                   tasks: state.tasks.map(t => 
                     t.id === taskId 
@@ -719,9 +790,40 @@ export const useOptimizationStore = create<OptimizationState>()(
                 return;
               }
 
+              // 如果达到最大迭代次数，则结束迭代
+              if (updatedTask.promptIterations.length >= updatedTask.maxIterations) {
+                console.log(`[runIteration] 任务 ${taskId} 已达到最大迭代次数 ${updatedTask.maxIterations}，标记为已达最大迭代`);
+                set(state => ({
+                  tasks: state.tasks.map(t => 
+                    t.id === taskId 
+                      ? { 
+                          ...t, 
+                          status: 'max_iterations_reached',
+                          updatedAt: new Date().toISOString() 
+                        }
+                      : t
+                  )
+                }));
+                return;
+              }
+
               // 否则继续下一轮迭代
               await runIteration();
             } catch (error) {
+              // 处理取消错误
+              if (error instanceof OperationCancelledError) {
+                console.log(`[runIteration] 任务 ${taskId} 被用户取消: ${error.message}`);
+                // 确保任务状态被设置为暂停
+                set(state => ({
+                  tasks: state.tasks.map(t => 
+                    t.id === taskId 
+                      ? { ...t, status: 'paused', updatedAt: new Date().toISOString() }
+                      : t
+                  )
+                }));
+                return; // 不再继续迭代
+              }
+              
               console.error('优化迭代执行失败:', error);
               set(state => ({
                 error: (error as Error).message,
@@ -737,17 +839,32 @@ export const useOptimizationStore = create<OptimizationState>()(
           // 开始第一轮迭代
           await runIteration();
         } catch (error) {
-          console.error('开始优化失败:', error);
-          set({ 
-            error: (error as Error).message,
-            tasks: get().tasks.map(t => 
-              t.id === taskId 
-                ? { ...t, status: 'not_started', updatedAt: new Date().toISOString() }
-                : t
-            )
-          });
+          // 处理取消错误
+          if (error instanceof OperationCancelledError) {
+            console.log(`任务 ${taskId} 被用户取消: ${error.message}`);
+            // 确保任务状态被设置为暂停
+            set(state => ({
+              tasks: state.tasks.map(t => 
+                t.id === taskId 
+                  ? { ...t, status: 'paused', updatedAt: new Date().toISOString() }
+                  : t
+              )
+            }));
+          } else {
+            console.error('开始优化失败:', error);
+            set({ 
+              error: (error as Error).message,
+              tasks: get().tasks.map(t => 
+                t.id === taskId 
+                  ? { ...t, status: 'not_started', updatedAt: new Date().toISOString() }
+                  : t
+              )
+            });
+          }
         } finally {
-          toaster.dismiss(toasterId);
+          if (toasterId) {
+            toaster.dismiss(toasterId);
+          }
         }
       },
       
@@ -762,6 +879,12 @@ export const useOptimizationStore = create<OptimizationState>()(
             ),
           }));
           console.log(`停止优化任务: ${taskId}`);
+          // 当用户点击停止时，如果有toast通知，也应该关闭
+          toaster.create({
+            description: "当前已发送的请求返回后，任务将停止",
+            type: "default",
+            duration: 3000,
+          });
         } catch (error) {
           set({ error: (error as Error).message });
         }
@@ -913,6 +1036,34 @@ export const useOptimizationStore = create<OptimizationState>()(
           }),
         }));
         console.log(`Report for iteration ${iterationId} in task ${taskId} marked as interacted (showReport: false).`);
+      },
+      
+      showSummary: (taskId, iterationId) => {
+        set(state => {
+          const task = state.tasks.find(t => t.id === taskId);
+          if (!task) return state;
+          
+          // 先关闭所有其他报告
+          const updatedTasks = state.tasks.map(t => {
+            if (t.id === taskId) {
+              return {
+                ...t,
+                promptIterations: t.promptIterations.map(iter => {
+                  // 关闭其他报告，打开当前报告
+                  return {
+                    ...iter,
+                    showReport: iter.id === iterationId
+                  };
+                }),
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return t;
+          });
+          
+          return { tasks: updatedTasks };
+        });
+        console.log(`Report for iteration ${iterationId} in task ${taskId} shown (showReport: true).`);
       }
     }),
     {
@@ -925,6 +1076,21 @@ export const useOptimizationStore = create<OptimizationState>()(
     }
   )
 );
+
+// 监听浏览器关闭或刷新事件，将正在进行的任务状态设置为暂停
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    useOptimizationStore.setState(state => {
+      const updatedTasks = state.tasks.map(task => 
+        task.status === 'in_progress' 
+          ? { ...task, status: 'paused' as 'paused', updatedAt: new Date().toISOString() } 
+          : task
+      );
+      console.log('Browser closing/refreshing, paused in-progress tasks.');
+      return { tasks: updatedTasks };
+    });
+  });
+}
 
 // 选择器：获取当前任务的测试用例和提示词迭代
 export const useCurrentTestCases = () => useOptimizationStore(state => {

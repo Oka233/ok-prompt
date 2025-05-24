@@ -120,7 +120,7 @@ export function OptimizationHeader({
           </Heading>
           <Text fontSize="sm" color="gray.500" mt={1}>
             数据集: <Text as="span" fontWeight="medium" color="gray.700">{datasetName}</Text> | 
-            模式: <Text as="span" fontWeight="medium" color="gray.700">{mode}</Text>
+            模式: <Text as="span" fontWeight="medium" color="gray.700">{mode === 'strict' ? '严格模式' : '描述性模式'}</Text>
           </Text>
         </Box>
         <Box textAlign={isMobile ? "left" : "right"} flexShrink={0}>
@@ -128,10 +128,9 @@ export function OptimizationHeader({
             <Text fontSize="sm" color="gray.500">
               状态:
             </Text>
-            <Badge colorScheme={
+            <Badge colorPalette={
               status === 'completed' ? 'blue' : 
-              status === 'in_progress' ? 'green' : 
-              status === 'paused' ? 'yellow' : 
+              status === 'in_progress' ? 'green' :
               'gray'
             } px={2} py={1} borderRadius="md">
               {status === 'paused' ? '已暂停' : 
@@ -147,7 +146,6 @@ export function OptimizationHeader({
               {status === 'in_progress' ? (
                 <Button
                   size="sm"
-                  colorScheme="red"
                   variant="outline"
                   onClick={handleStopOptimization}
                 >
@@ -157,7 +155,7 @@ export function OptimizationHeader({
               ) : status === 'paused' ? (
                 <Button
                   size="sm"
-                  colorScheme="blue"
+                  colorPalette="blue"
                   variant="outline"
                   onClick={handleStartOptimization}
                 >
@@ -167,9 +165,10 @@ export function OptimizationHeader({
               ) : (
                 <Button
                   size="sm"
-                  colorScheme="blue"
+                  colorPalette="blue"
                   variant="outline"
                   onClick={handleStartOptimization}
+                  disabled={status === 'completed'}
                 >
                   <FiPlay />
                   <Text>开始优化</Text>
@@ -313,13 +312,13 @@ export function OptimizationHeader({
                 </Text>
               </Box>
               <HStack justifyContent="flex-end" gap={3} mt={2}>
-                <Button size="sm" variant="ghost" onClick={handleCancelAdvancedSettings}>
+                <Button size="sm" variant="outline" onClick={handleCancelAdvancedSettings}>
                   <FiXCircle />
                   取消
                 </Button>
-                <Button size="sm" colorScheme="blue" onClick={handleSaveAdvancedSettings}>
+                <Button size="sm" onClick={handleSaveAdvancedSettings}>
                   <FiSave />
-                  保存更改
+                  保存
                 </Button>
               </HStack>
             </VStack>

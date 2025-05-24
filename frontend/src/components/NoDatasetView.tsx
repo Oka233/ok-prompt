@@ -13,10 +13,10 @@ import {
   IconButton,
   Checkbox
 } from '@chakra-ui/react'
-import { FiUploadCloud, FiPlus, FiTrash2 } from 'react-icons/fi'
+import { FiUploadCloud, FiPlus, FiTrash2, FiLayers } from 'react-icons/fi'
 import { useState, useMemo, useEffect } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
-import { TestSet, ModelConfig } from '@/types/optimization'
+import { ModelConfig } from '@/types/optimization'
 
 interface NoDatasetViewProps {
   onUpload: () => void
@@ -34,8 +34,8 @@ interface TestModeOption {
 
 const testModeOptions = createListCollection({
   items: [
-    { label: '严格模式 (strict)', value: 'strict' },
-    { label: '描述性模式 (descriptive)', value: 'descriptive' }
+    { label: '严格模式 (测试用例输出即模型的预期输出)', value: 'strict' },
+    { label: '描述性模式 (测试用例输出是对模型预期输出的描述)', value: 'descriptive' }
   ] as TestModeOption[]
 })
 
@@ -189,7 +189,7 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
       pt={10}
     >
       <Icon 
-        as={FiUploadCloud} 
+        as={FiLayers} 
         w={12} 
         h={12} 
         color="gray.400" 
@@ -264,7 +264,7 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
             </Box>
 
             <Box>
-              <Text mb={2} fontWeight="medium">目标模型 (可选)</Text>
+              <Text mb={2} fontWeight="medium">目标模型</Text>
               <Select.Root 
                 collection={modelOptions} 
                 size="sm" 
@@ -304,7 +304,7 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
             </Box>
 
             <Box>
-              <Text mb={2} fontWeight="medium">优化模型 (可选)</Text>
+              <Text mb={2} fontWeight="medium">优化模型</Text>
               <Select.Root 
                 collection={modelOptions} 
                 size="sm" 
@@ -360,9 +360,9 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
             </Box>
             
             <Box>
-                <Text mb={2} fontWeight="medium">测试用例数据集 (可选)</Text>
+                <Text mb={2} fontWeight="medium">测试用例数据集</Text>
                 <Text fontSize="sm" color="gray.500" mb={2}>
-                  {"上传JSON文件批量导入测试用例。格式: `[{\"input\": \"输入1\", \"output\": \"期望输出1\"}, ...]`"}
+                  {"上传JSON文件批量导入测试用例。格式: [{\"input\": \"输入1\", \"output\": \"期望输出1\"}, ...]"}
                 </Text>
                 <Box 
                   border="2px dashed" 
@@ -418,7 +418,7 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                         onClick={() => removeTestCase(index)}
                         size="sm"
                         variant="ghost"
-                        colorScheme="red"
+                        colorPalette="red"
                         disabled={testCases.length <= 1}
                       >
                         <FiTrash2 />
@@ -452,7 +452,6 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
         
         <Flex justifyContent="center" mt={8}>
           <Button
-            colorScheme="green"
             size="lg"
             fontWeight="semibold"
             py={3}

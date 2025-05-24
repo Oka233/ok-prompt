@@ -57,6 +57,8 @@ export function Sidebar() {
         return `进行中 (迭代 ${task.promptIterations.length}/${task.maxIterations})`;
       case 'max_iterations_reached':
         return '已达最大迭代';
+      case 'paused':
+        return '已暂停';
       default:
         return '未开始';
     }

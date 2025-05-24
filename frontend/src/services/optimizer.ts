@@ -5,6 +5,7 @@ import {
 } from '@/utils/promptTemplates';
 import { TestCase, TestMode } from '@/types/optimization';
 import { ModelProvider, ModelMessage } from '@/types/model';
+import { OperationCancelledError } from '@/errors/OperationCancelledError';
 
 export interface InputTestResult {
   input: string;
@@ -59,14 +60,22 @@ export async function executeTests({
   prompt,
   testCases,
   model,
+  isCancelled,
 }: {
   prompt: string;
   testCases: TestCase[];
   model: ModelProvider;
+  isCancelled?: () => boolean; // 新增参数，用于检查任务是否被取消
 }): Promise<TestResult[]> {
   const results: TestResult[] = [];
 
   for (let i = 0; i < testCases.length; i++) {
+    // 在每次LLM调用前检查是否需要取消
+    if (isCancelled && isCancelled()) {
+      console.log(`[executeTests] 任务已被取消，已处理 ${i}/${testCases.length} 个测试用例`);
+      throw new OperationCancelledError(`[executeTests] 任务已被取消，已处理 ${i}/${testCases.length} 个测试用例`);
+    }
+    
     const testCase = testCases[i];
     
     // 构建输入
@@ -125,15 +134,23 @@ export async function evaluateResults({
   testResults,
   testMode,
   model,
+  isCancelled,
 }: {
   prompt: string;
   testResults: InputTestResult[];
   testMode: TestMode;
   model: ModelProvider;
+  isCancelled?: () => boolean; // 新增参数，用于检查任务是否被取消
 }): Promise<EvaluationResult[]> {
   const evaluatedResults = [];
   
   for (let i = 0; i < testResults.length; i++) {
+    // 在每次LLM调用前检查是否需要取消
+    if (isCancelled && isCancelled()) {
+      console.log(`[evaluateResults] 任务已被取消，已评估 ${i}/${testResults.length} 个结果`);
+      throw new OperationCancelledError(`[evaluateResults] 任务已被取消，已评估 ${i}/${testResults.length} 个结果`);
+    }
+    
     const result = testResults[i];
     
     // 如果是严格模式且输出完全匹配，则自动评分为5分
@@ -245,12 +262,14 @@ export async function summarizeEvaluation({
   testMode,
   model,
   onProgress,
+  isCancelled,
 }: {
   prompt: string;
   testResults: InputTestResult[];
   testMode: TestMode;
   model: ModelProvider;
   onProgress?: (partialSummary: string) => void;
+  isCancelled?: () => boolean; // 新增参数，用于检查任务是否被取消
 }): Promise<EvaluationSummary> {
   // 计算统计数据
   const totalCases = testResults.length;
@@ -259,6 +278,12 @@ export async function summarizeEvaluation({
   const perfectScores = scores.filter(score => score === 5).length;
   
   try {
+    // 在LLM调用前检查是否需要取消
+    if (isCancelled && isCancelled()) {
+      console.log(`[summarizeEvaluation] 任务已被取消，跳过评估总结`);
+      throw new OperationCancelledError(`[summarizeEvaluation] 任务已被取消，跳过评估总结`);
+    }
+    
     // 构建总结提示词
     const summaryPrompt = generateSummaryPrompt(
       prompt,
@@ -329,6 +354,9 @@ export async function summarizeEvaluation({
     }
     
   } catch (error) {
+    if (error instanceof OperationCancelledError) {
+      throw error; // 重新抛出取消错误
+    }
     console.error('生成评估总结时出错:', error);
     
     return {
@@ -356,6 +384,7 @@ export async function optimizePrompt({
   userFeedback,
   model,
   onProgress,
+  isCancelled,
 }: {
   currentPrompt: string;
   evaluationSummary: string;
@@ -364,6 +393,7 @@ export async function optimizePrompt({
   userFeedback?: string;
   model: ModelProvider;
   onProgress?: (partialPrompt: string) => void;
+  isCancelled?: () => boolean; // 新增参数，用于检查任务是否被取消
 }): Promise<{
   newPrompt: string;
   tokenUsage: {
@@ -373,6 +403,12 @@ export async function optimizePrompt({
   };
 }> {
   try {
+    // 在LLM调用前检查是否需要取消
+    if (isCancelled && isCancelled()) {
+      console.log(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
+      throw new OperationCancelledError(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
+    }
+    
     // 获取表现较差的用例
     const lowScoringCases = testResults
       .filter(result => (result.score || 0) <= 4) // 处理null值
@@ -458,6 +494,9 @@ export async function optimizePrompt({
     }
     
   } catch (error) {
+    if (error instanceof OperationCancelledError) {
+      throw error; // 重新抛出取消错误
+    }
     console.error('优化提示词时出错:', error);
     
     // 出错时返回原始提示词
