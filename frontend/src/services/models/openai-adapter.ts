@@ -34,8 +34,8 @@ export class OpenAIAdapter implements ModelProvider {
 
   constructor(
     private apiKey: string,
-    private baseUrl: string,
-    private modelName: string
+    private modelName: string,
+    private baseUrl?: string
   ) {
     this.client = getClient(apiKey, baseUrl);
   }

@@ -10,12 +10,20 @@ export interface TestSet {
   data: TestCase[];
 }
 
+// 模型类型枚举
+export enum ModelType {
+  OPENAI = 'openai',
+  OPENAI_COMPATIBLE = 'openai_compatible',
+  GOOGLE = 'google'
+}
+
 // 模型配置类型
 export interface ModelConfig {
   id: string;
   name: string;
   apiKey: string;
-  baseUrl: string;
+  baseUrl?: string;
+  modelType: ModelType;
   createdAt: string;
   updatedAt: string;
 }

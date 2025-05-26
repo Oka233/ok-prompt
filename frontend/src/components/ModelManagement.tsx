@@ -7,12 +7,34 @@ import {
   Input,
   useDisclosure,
   IconButton,
+  RadioCard,
+  HStack,
+  VStack,
 } from '@chakra-ui/react'
 import { Table } from '@chakra-ui/react'
 import { FiPlus, FiEdit2, FiTrash2, FiSave, FiXCircle } from 'react-icons/fi'
 import { useState, useRef } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
-import { ModelConfig } from '@/types/optimization'
+import { ModelConfig, ModelType } from '@/types/optimization'
+
+// 模型类型配置
+const modelTypeOptions = [
+  { 
+    value: ModelType.OPENAI, 
+    title: 'OpenAI', 
+    description: '使用OpenAI官方API' 
+  },
+  { 
+    value: ModelType.OPENAI_COMPATIBLE, 
+    title: 'OpenAI兼容', 
+    description: '使用兼容OpenAI接口的API' 
+  },
+  { 
+    value: ModelType.GOOGLE, 
+    title: 'Google', 
+    description: '使用Google AI API' 
+  }
+]
 
 export function ModelManagement() {
   const { models, addModel, updateModel, deleteModel } = useOptimizationStore()
@@ -22,9 +44,12 @@ export function ModelManagement() {
   const [modelName, setModelName] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
+  const [selectedModelType, setSelectedModelType] = useState<ModelType>(ModelType.OPENAI)
   const [error, setError] = useState<string | null>(null)
   
   const initialRef = useRef<HTMLInputElement>(null)
+
+  console.log(selectedModelType)
   
   const handleAddModel = () => {
     setIsEditing(false)
@@ -32,6 +57,7 @@ export function ModelManagement() {
     setModelName('')
     setApiKey('')
     setBaseUrl('')
+    setSelectedModelType(ModelType.OPENAI)
     setError(null)
     onOpen()
   }
@@ -41,7 +67,8 @@ export function ModelManagement() {
     setCurrentModel(model)
     setModelName(model.name)
     setApiKey(model.apiKey)
-    setBaseUrl(model.baseUrl)
+    setBaseUrl(model.baseUrl || '')
+    setSelectedModelType(model.modelType)
     setError(null)
     onOpen()
   }
@@ -69,9 +96,10 @@ export function ModelManagement() {
       return
     }
     
-    if (!baseUrl.trim()) {
-      setError('请输入基础URL')
-      return
+    let finalBaseUrl = baseUrl.trim(); 
+    if (selectedModelType === ModelType.OPENAI_COMPATIBLE && !finalBaseUrl) {
+      setError('OpenAI兼容模型需要提供基础URL');
+      return;
     }
     
     try {
@@ -79,11 +107,12 @@ export function ModelManagement() {
         await updateModel(currentModel.id, {
           name: modelName,
           apiKey,
-          baseUrl
+          baseUrl: selectedModelType === ModelType.OPENAI_COMPATIBLE ? finalBaseUrl : undefined,
+          modelType: selectedModelType
         })
         alert('模型已更新')
       } else {
-        await addModel(modelName, apiKey, baseUrl)
+        await addModel(modelName, apiKey, selectedModelType === ModelType.OPENAI_COMPATIBLE ? finalBaseUrl : '', selectedModelType)
         alert('模型已添加')
       }
       onClose()
@@ -96,6 +125,12 @@ export function ModelManagement() {
   const maskApiKey = (key: string) => {
     if (key.length <= 8) return '********'
     return key.substring(0, 4) + '********' + key.substring(key.length - 4)
+  }
+
+  // 获取模型类型显示名称
+  const getModelTypeName = (type: ModelType) => {
+    const option = modelTypeOptions.find(opt => opt.value === type)
+    return option ? option.title : '未知'
   }
   
   return (
@@ -120,6 +155,7 @@ export function ModelManagement() {
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>模型名称</Table.ColumnHeader>
+                <Table.ColumnHeader>类型</Table.ColumnHeader>
                 <Table.ColumnHeader>API密钥</Table.ColumnHeader>
                 <Table.ColumnHeader>基础URL</Table.ColumnHeader>
                 <Table.ColumnHeader>创建时间</Table.ColumnHeader>
@@ -130,6 +166,7 @@ export function ModelManagement() {
               {models.map(model => (
                 <Table.Row key={model.id}>
                   <Table.Cell>{model.name}</Table.Cell>
+                  <Table.Cell>{getModelTypeName(model.modelType)}</Table.Cell>
                   <Table.Cell>{maskApiKey(model.apiKey)}</Table.Cell>
                   <Table.Cell>{model.baseUrl}</Table.Cell>
                   <Table.Cell>{new Date(model.createdAt).toLocaleString()}</Table.Cell>
@@ -179,7 +216,7 @@ export function ModelManagement() {
           <Box
             bg="white"
             borderRadius="md"
-            maxW="500px"
+            maxW="800px"
             w="90%"
             p={6}
             position="relative"
@@ -195,43 +232,75 @@ export function ModelManagement() {
               </Box>
             )}
             
-            <Box mb={4}>
-              <Text mb={2}>模型名称</Text>
-              <Input
-                ref={initialRef}
-                placeholder="例如: GPT-4"
-                value={modelName}
-                onChange={(e) => setModelName(e.target.value)}
-              />
-            </Box>
+            <Flex gap={6}>
+              {/* 左侧模型类型选择 */}
+              <Box width="250px">
+                <Text mb={2} fontWeight="medium">模型类型</Text>
+                <RadioCard.Root value={selectedModelType}>
+                  <VStack align="stretch" gap={2}>
+                    {modelTypeOptions.map((item) => (
+                      <RadioCard.Item
+                        key={item.value}
+                        value={item.value}
+                        width="full"
+                        onClick={() => setSelectedModelType(item.value)}
+                      >
+                        <RadioCard.ItemHiddenInput />
+                        <RadioCard.ItemControl>
+                          <RadioCard.ItemContent>
+                            <RadioCard.ItemText>{item.title}</RadioCard.ItemText>
+                          </RadioCard.ItemContent>
+                          <RadioCard.ItemIndicator />
+                        </RadioCard.ItemControl>
+                      </RadioCard.Item>
+                    ))}
+                  </VStack>
+                </RadioCard.Root>
+              </Box>
+              
+              {/* 右侧表单字段 */}
+              <Box flex="1">
+                <Box mb={4}>
+                  <Text mb={2} fontWeight="medium">模型名称 *</Text>
+                  <Input
+                    ref={initialRef}
+                    placeholder="例如: GPT-4"
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}
+                  />
+                </Box>
 
-            <Box mb={4}>
-              <Text mb={2}>API密钥</Text>
-              <Input
-                placeholder="输入API密钥"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </Box>
+                <Box mb={4}>
+                  <Text mb={2} fontWeight="medium">API密钥 *</Text>
+                  <Input
+                    placeholder="输入API密钥"
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
+                </Box>
 
-            <Box mb={6}>
-              <Text mb={2}>基础URL</Text>
-              <Input
-                placeholder="例如: https://api.openai.com/v1"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-              />
-            </Box>
+                {selectedModelType === ModelType.OPENAI_COMPATIBLE && (
+                  <Box mb={4}>
+                    <Text mb={2} fontWeight="medium">基础URL *</Text>
+                    <Input
+                      placeholder="例如: https://api.example.com/v1"
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                    />
+                  </Box>
+                )}
+              </Box>
+            </Flex>
 
-            <Flex justifyContent="flex-end" gap={3}>
+            <Flex justifyContent="flex-end" gap={3} mt={6}>
               <Button size="sm" variant="outline" onClick={onClose}>
                 <FiXCircle />
                 取消
               </Button>
               <Button size="sm" onClick={handleSubmit}>
                 <FiSave />
-                添加
+                {isEditing ? '保存' : '添加'}
               </Button>
             </Flex>
           </Box>

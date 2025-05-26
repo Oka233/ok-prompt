@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { OptimizationTask, TestSet, ModelConfig, TestCaseResult, PromptIteration } from '@/types/optimization';
+import { OptimizationTask, TestSet, ModelConfig, TestCaseResult, PromptIteration, ModelType } from '@/types/optimization';
 import {
   executeTests,
   evaluateResults,
@@ -50,7 +50,7 @@ interface OptimizationState {
   stopOptimization: (taskId: string) => Promise<void>;
 
   // 模型管理
-  addModel: (name: string, apiKey: string, baseUrl: string) => Promise<void>;
+  addModel: (name: string, apiKey: string, baseUrl: string, modelType: ModelType) => Promise<void>;
   updateModel: (id: string, data: Partial<ModelConfig>) => Promise<void>;
   deleteModel: (id: string) => Promise<void>;
 
@@ -911,7 +911,7 @@ export const useOptimizationStore = create<OptimizationState>()(
       },
       
       // 模型管理 (保持不变,仅列出)
-      addModel: async (name, apiKey, baseUrl) => {
+      addModel: async (name, apiKey, baseUrl, modelType) => {
         set({ error: null });
         try {
           const newModel: ModelConfig = {
@@ -919,6 +919,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             name,
             apiKey,
             baseUrl,
+            modelType,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
