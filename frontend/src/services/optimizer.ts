@@ -78,9 +78,10 @@ export async function executeTests({
     
     const testCase = testCases[i];
     
-    // 构建输入
-    const fullInput = `${prompt}\n\n输入文本：\n${testCase.input}\n\n提取结果：`;
-    const messages: ModelMessage[] = [{ role: 'user', content: fullInput }];
+    const messages: ModelMessage[] = [
+      { role: 'system', content: prompt },
+      { role: 'user', content: testCase.input }
+    ];
     
     try {
       // 调用目标LLM
@@ -169,7 +170,7 @@ export async function evaluateResults({
     
     try {
       // 构建评估提示词
-      const evaluationPrompt = generateEvaluationPrompt(
+      const messages = generateEvaluationPrompt(
         prompt,
         { input: result.input, output: result.expectedOutput },
         result.actualOutput,
@@ -177,7 +178,6 @@ export async function evaluateResults({
       );
       
       // 调用评估LLM
-      const messages: ModelMessage[] = [{ role: 'user', content: evaluationPrompt }];
       const response = await model.generateCompletion(messages);
       
       const evalResponse = response.answer;
@@ -219,31 +219,29 @@ export async function evaluateResults({
  */
 function parseEvaluationResponse(response: string): { score: number; reasoning: string } {
   try {
-    const evalLines = response.split('\n');
+    // 从<Score>标签中提取分数
+    const scoreMatch = response.match(/<Score>(.*?)<\/Score>/s);
+    // 从<Reason>标签中提取评估理由
+    const reasonMatch = response.match(/<Reason>(.*?)<\/Reason>/s);
+    
     let score = 3; // 默认分数
     let reasoning = '';
     
-    // 查找评分行
-    for (const line of evalLines) {
-      if (line.includes('评分') || /^\d+$/.test(line.trim())) {
-        // 提取数字
-        const match = line.match(/[1-5]/);
-        if (match) {
-          score = parseInt(match[0], 10);
-          break;
-        }
+    if (scoreMatch && scoreMatch[1]) {
+      // 提取数字
+      const scoreText = scoreMatch[1].trim();
+      const match = scoreText.match(/[1-5]/);
+      if (match) {
+        score = parseInt(match[0], 10);
       }
+    } else {
+      console.warn('未找到<Score>标签，使用默认分数');
     }
     
-    // 查找评估理由
-    const reasoningIndex = evalLines.findIndex(line => 
-      line.includes('评估理由') || line.includes('理由')
-    );
-    
-    if (reasoningIndex !== -1 && reasoningIndex + 1 < evalLines.length) {
-      reasoning = evalLines.slice(reasoningIndex + 1).join(' ').trim();
+    if (reasonMatch && reasonMatch[1]) {
+      reasoning = reasonMatch[1].trim();
     } else {
-      reasoning = `评分: ${score}，未提供明确理由`;
+      reasoning = `未找到<Reason>标签，无法获取评估理由`;
     }
     
     return { score, reasoning };
@@ -285,7 +283,7 @@ export async function summarizeEvaluation({
     }
     
     // 构建总结提示词
-    const summaryPrompt = generateSummaryPrompt(
+    const messages = generateSummaryPrompt(
       prompt,
       testMode,
       totalCases,
@@ -300,8 +298,6 @@ export async function summarizeEvaluation({
         reasoning: res.comment || '' // 处理null值
       }))
     );
-    
-    const messages = [{ role: 'user' as const, content: summaryPrompt }];
     
     // 如果提供了进度回调，使用流式API
     if (onProgress) {
@@ -322,7 +318,9 @@ export async function summarizeEvaluation({
             } else {
               fullContent = answer;
             }
-            onProgress(fullContent);
+            // 从标签中提取内容
+            const extractedContent = extractSummaryContent(fullContent);
+            onProgress(extractedContent);
           },
           onUsage: (usage) => {
             tokenUsage = usage;
@@ -337,18 +335,19 @@ export async function summarizeEvaluation({
         avgScore,
         perfectScoreCount: perfectScores,
         totalCases,
-        summaryReport: fullContent,
+        summaryReport: extractSummaryContent(fullContent),
         tokenUsage
       };
     } else {
       // 使用非流式API
       const response = await model.generateCompletion(messages);
+      const summaryContent = extractSummaryContent(response.answer);
       
       return {
         avgScore,
         perfectScoreCount: perfectScores,
         totalCases,
-        summaryReport: response.answer, // 使用answer部分
+        summaryReport: summaryContent,
         tokenUsage: {
           promptTokens: response.usage.promptTokens,
           completionTokens: response.usage.completionTokens,
@@ -378,26 +377,56 @@ export async function summarizeEvaluation({
 }
 
 /**
+ * 从回复中提取Summary标签内的内容
+ */
+function extractSummaryContent(content: string): string {
+  // 从<Summary>标签中提取内容
+  const summaryMatch = content.match(/<Summary>([\s\S]*?)<\/Summary>/);
+  if (summaryMatch && summaryMatch[1]) {
+    return summaryMatch[1].trim();
+  }
+  // 如果没有找到标签，则记录警告并返回原始内容
+  console.warn('未找到<Summary>标签，返回原始内容');
+  return content;
+}
+
+/**
  * 优化提示词
  */
 export async function optimizePrompt({
   currentPrompt,
   evaluationSummary,
-  testResults,
   testMode,
   userFeedback,
   model,
   onProgress,
   isCancelled,
+  historicalIterations,
+  currentResults,
+  currentAvgScore,
 }: {
   currentPrompt: string;
   evaluationSummary: string;
-  testResults: InputTestResult[];
   testMode: TestMode;
   userFeedback?: string;
   model: ModelProvider;
   onProgress?: (partialPrompt: string) => void;
   isCancelled?: () => boolean; // 新增参数，用于检查任务是否被取消
+  historicalIterations?: Array<{
+    iteration: number,
+    prompt: string,
+    avgScore: number | null,
+    summary: string,
+    userFeedback?: string
+  }>;
+  currentResults?: Array<{
+    input: string,
+    expectedOutput: string,
+    actualOutput: string,
+    score: number | null,
+    comment: string | null
+  }>;
+  currentAvgScore?: number | null;
 }): Promise<{
   newPrompt: string;
   tokenUsage: {
@@ -413,43 +442,16 @@ export async function optimizePrompt({
       throw new OperationCancelledError(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
     }
     
-    // 获取表现较差的用例
-    const lowScoringCases = testResults
-      .filter(result => (result.score || 0) <= 4) // 处理null值
-      .map(result => ({
-        input: result.input,
-        expectedOutput: result.expectedOutput,
-        actualOutput: result.actualOutput,
-        score: result.score || 0, // 处理null值
-        reasoning: result.comment || '' // 处理null值
-      }));
-    
-    // 如果没有低分用例但仍有用例未达到满分，添加一些代表性用例
-    if (lowScoringCases.length === 0 && testResults.some(result => (result.score || 0) < 5)) {
-      testResults
-        .filter(result => (result.score || 0) < 5)
-        .slice(0, 3)
-        .forEach(result => {
-          lowScoringCases.push({
-            input: result.input,
-            expectedOutput: result.expectedOutput,
-            actualOutput: result.actualOutput,
-            score: result.score || 0, // 处理null值
-            reasoning: result.comment || '' // 处理null值
-          });
-        });
-    }
-    
     // 构建优化提示词
-    const optimizationPrompt = generateOptimizationPrompt(
+    const messages = generateOptimizationPrompt(
       currentPrompt,
       evaluationSummary,
       testMode,
-      lowScoringCases,
-      userFeedback
+      userFeedback,
+      historicalIterations,
+      currentResults,
+      currentAvgScore
     );
-    
-    const messages = [{ role: 'user' as const, content: optimizationPrompt }];
     
     // 如果提供了进度回调，使用流式API
     if (onProgress) {
@@ -523,22 +525,13 @@ export async function optimizePrompt({
  * 清理优化后的提示词（移除可能的标记和前缀）
  */
 function cleanOptimizedPrompt(prompt: string): string {
-  const lines = prompt.split('\n');
-  const cleanedLines = [];
-  let capture = true;
-  
-  // 跳过可能的前缀行
-  for (const line of lines) {
-    // 如果遇到明显的标记行，开始/停止捕获
-    if (line.includes('优化后的新提示词') || line.includes('新提示词')) {
-      capture = true;
-      continue;
-    }
-    
-    if (capture) {
-      cleanedLines.push(line);
-    }
+  // 从<Prompt>标签中提取内容
+  const promptMatch = prompt.match(/<Prompt>([\s\S]*?)<\/Prompt>/);
+  if (promptMatch && promptMatch[1]) {
+    return promptMatch[1].trim();
   }
   
-  return cleanedLines.join('\n').trim();
+  // 如果没有找到<Prompt>标签，返回完整内容并记录警告
+  console.warn('未找到<Prompt>标签，返回原始内容');
+  return prompt.trim();
 }

@@ -330,6 +330,23 @@ export const useOptimizationStore = create<OptimizationState>()(
                   comment: tc.iterationResults[currentIteration - 1].comment,
                 }));
 
+                // 收集历史迭代信息
+                const historicalIterations = task.promptIterations
+                  .filter(iter => iter.iteration < currentIteration)
+                  .map(iter => ({
+                    iteration: iter.iteration,
+                    prompt: iter.prompt,
+                    avgScore: iter.avgScore,
+                    summary: iter.reportSummary,
+                    userFeedback: iter.userFeedback,
+                  }));
+
+                // 计算当前平均分数
+                const currentScores = evaluatedResults.map(result => result.score || 0);
+                const currentAvgScore = currentScores.length > 0 
+                  ? currentScores.reduce((sum, score) => sum + score, 0) / currentScores.length 
+                  : null;
+
                 // 创建一个临时提示词，用于流式更新
                 set(state => {
                   const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
@@ -357,10 +374,12 @@ export const useOptimizationStore = create<OptimizationState>()(
                 const optimizationResult = await optimizePrompt({
                   currentPrompt: previousIteration.prompt,
                   evaluationSummary: previousIteration.reportSummary,
-                  testResults: evaluatedResults,
                   testMode: task.testSet.mode,
                   userFeedback: previousIteration?.userFeedback,
                   model: optimizationModelInstance,
+                  historicalIterations: historicalIterations,
+                  currentResults: evaluatedResults,
+                  currentAvgScore: currentAvgScore,
                   onProgress: (partialPrompt) => {
                     // 流式更新提示词
                     set(state => {
