@@ -125,7 +125,6 @@ export class GoogleAdapter implements ModelProvider {
         },
       });
       
-      let fullContent = '';
       let thoughts = '';
       let answer = '';
       

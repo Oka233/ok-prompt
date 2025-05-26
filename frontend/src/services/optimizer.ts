@@ -318,7 +318,7 @@ export async function summarizeEvaluation({
         {
           onContent: (thought, answer) => {
             if (!answer) {
-              fullContent = thought;
+              fullContent = `[思考中]  ${thought}`;
             } else {
               fullContent = answer;
             }
@@ -466,7 +466,7 @@ export async function optimizePrompt({
         {
           onContent: (thought, answer) => {
             if (!answer) {
-              fullContent = thought;
+              fullContent = `[思考中]  \n${thought}`;
             } else {
               fullContent = answer;
             }

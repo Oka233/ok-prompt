@@ -95,7 +95,6 @@ export class OpenAIAdapter implements ModelProvider {
       let thought = ''; // 用于累积推理内容
       
       for await (const chunk of stream) {
-        console.log('chunk', chunk);
         // 处理推理内容
         const reasoningContent = (chunk.choices?.[0]?.delta as any)?.reasoning_content;
         if (reasoningContent) {

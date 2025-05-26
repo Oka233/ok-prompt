@@ -96,7 +96,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             iteration: 0,
             prompt: initialPrompt,
             avgScore: null,
-            reportSummary: '-',
+            reportSummary: '尚未生成',
             waitingForFeedback: requireUserFeedback,
             stage: 'not_started'
           };
@@ -276,7 +276,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 iteration: currentIteration,
                 prompt: '',
                 avgScore: null,
-                reportSummary: '-',
+                reportSummary: '尚未生成',
                 waitingForFeedback: false,
                 stage: 'not_started'
               } as PromptIteration;

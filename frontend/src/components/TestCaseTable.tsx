@@ -18,31 +18,25 @@ export function TestCaseTable() {
   const renderScoreBadge = (score: number) => {
     let textColor = "white";
     let bgColor = "gray.500";
-    let label = "";
     
     switch(score) {
       case 5:
         bgColor = "green.500";
-        label = "优秀";
         break;
       case 4:
         bgColor = "green.400";
         textColor = "white";
-        label = "遗漏次要信息";
         break;
       case 3:
         bgColor = "orange.400";
         textColor = "white";
-        label = "遗漏关键信息";
         break;
       case 2:
         bgColor = "red.400";
         textColor = "white";
-        label = "信息严重不足";
         break;
       case 1:
         bgColor = "red.500";
-        label = "完全不符合要求";
         break;
     }
     
@@ -59,9 +53,6 @@ export function TestCaseTable() {
         >
           {score}
         </Badge>
-        <Text as="span" fontSize="xs" fontStyle="italic" color="gray.500" ml={2}>
-          {label}
-        </Text>
       </Flex>
     )
   }
@@ -97,18 +88,23 @@ export function TestCaseTable() {
       if (result) {
         cells.push(
           <Table.Cell key={`result-${i}`}>
-            <Text 
-              fontSize="sm" 
-              overflow="hidden" 
-              textOverflow="ellipsis" 
-              whiteSpace="nowrap"
-              title={result.output}
-            >
-              {result.output}
-            </Text>
-            <Box mt={1}>
-              {renderScoreBadge(result.score)}
-            </Box>
+            <Flex alignItems="center">
+              {result.score && (
+                <Box mr={2}>
+                  {renderScoreBadge(result.score)}
+                </Box>
+              )}
+              <Text 
+                fontSize="sm" 
+                overflow="hidden" 
+                textOverflow="ellipsis" 
+                whiteSpace="nowrap"
+                lineClamp="2"
+                title={result.output}
+              >
+                {result.output}
+              </Text>
+            </Flex>
           </Table.Cell>
         );
       } else {

@@ -85,11 +85,11 @@ export function PromptIterationList() {
     }
     
     const stageText = {
-      'not_started': '未开始',
-      'generated': '已生成',
-      'tested': '已测试',
-      'evaluated': '已评估',
-      'summarized': '已总结',
+      'not_started': '0/4 未开始',
+      'generated': '1/4 已生成',
+      'tested': '2/4 已测试',
+      'evaluated': '3/4 已评估',
+      'summarized': '4/4 已总结',
     }
 
     const stage = item.stage;
@@ -135,7 +135,7 @@ export function PromptIterationList() {
               {getStageBadge(item)}
             </Flex>
             <Text fontSize="sm" color="gray.600" mt={2} mb={2}>
-              "{item.prompt}"
+              {item.prompt}
             </Text>
             
             <Box mt={2}>
