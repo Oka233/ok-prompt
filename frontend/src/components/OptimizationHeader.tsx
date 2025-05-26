@@ -45,6 +45,9 @@ export function OptimizationHeader({
   const isMobile = direction === 'column';
   const { deleteTask, models, tasks, updateTaskModels, startOptimization, stopOptimization, updateTaskFeedbackSetting } = useOptimizationStore();
   const { open, onOpen, onClose } = useDisclosure();
+  
+  // 删除确认对话框状态
+  const { open: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
 
   const currentTask = tasks.find(t => t.id === taskId);
   const status = currentTask?.status || 'not_started';
@@ -60,14 +63,13 @@ export function OptimizationHeader({
   }, [currentTask?.targetModelId, currentTask?.optimizationModelId, currentTask?.requireUserFeedback, taskId]);
 
   const modelOptionsCollection = createListCollection<ModelOption>({
-    items: models.map(model => ({ label: model.name, value: model.id }))
+    items: models.map(model => ({ label: model.displayName, value: model.id }))
   });
   const emptyModelOptionMessage: ModelOption = { label: "选择一个模型", value: "__placeholder__", disabled: true };
   
   const handleDelete = async () => {
-    if (window.confirm(`确定要删除任务 "${taskName}" 吗？此操作无法撤销。`)) {
-      await deleteTask(taskId);
-    }
+    await deleteTask(taskId);
+    onDeleteClose();
   };
 
   const handleSaveAdvancedSettings = async () => {
@@ -185,7 +187,7 @@ export function OptimizationHeader({
             <IconButton
               variant="outline"
               size="sm"
-              onClick={handleDelete}
+              onClick={onDeleteOpen}
             >
               <FiTrash2 />
             </IconButton>
@@ -195,10 +197,10 @@ export function OptimizationHeader({
               总迭代次数: <Text as="span" fontWeight="medium" color="gray.700">{iterationCount}</Text>
             </Text>
             <Text fontSize="sm" color="gray.500">
-              输入Token: <Text as="span" fontWeight="medium" color="gray.700">{currentTask?.tokenUsage?.promptTokens || 0}</Text>
+              目标模型: <Text as="span" fontWeight="medium" color="gray.700">输入{currentTask?.targetModelTokenUsage?.promptTokens || 0}/输出{currentTask?.targetModelTokenUsage?.completionTokens || 0}</Text>
             </Text>
             <Text fontSize="sm" color="gray.500">
-              输出Token: <Text as="span" fontWeight="medium" color="gray.700">{currentTask?.tokenUsage?.completionTokens || 0}</Text>
+              优化模型: <Text as="span" fontWeight="medium" color="gray.700">输入{currentTask?.optimizationModelTokenUsage?.promptTokens || 0}/输出{currentTask?.optimizationModelTokenUsage?.completionTokens || 0}</Text>
             </Text>
           </Flex>
         </Box>
@@ -324,6 +326,57 @@ export function OptimizationHeader({
             </VStack>
           </Box>
         </Box>
+      )}
+      
+      {/* 删除确认对话框 */}
+      {isDeleteOpen && (
+        <Portal>
+          <Box
+            position="fixed"
+            top="0"
+            left="0"
+            right="0"
+            bottom="0"
+            bg="rgba(0,0,0,0.4)"
+            zIndex="1000"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Box
+              bg="white"
+              borderRadius="md"
+              maxW="400px"
+              w="90%"
+              p={4}
+              position="relative"
+            >
+              <Heading size="sm" mb={3}>确认删除</Heading>
+              <Box position="absolute" top="10px" right="10px" cursor="pointer" onClick={onDeleteClose}>
+                ✕
+              </Box>
+              
+              <Text mb={2}>
+                确定要删除任务 "{taskName}" 吗？此操作无法撤销。
+              </Text>
+              
+              <Flex justifyContent="flex-end" gap={3}>
+                <Button size="sm" variant="outline" onClick={onDeleteClose}>
+                  <FiXCircle />
+                  取消
+                </Button>
+                <Button 
+                  size="sm" 
+                  colorScheme="red" 
+                  onClick={handleDelete}
+                >
+                  <FiTrash2 />
+                  删除
+                </Button>
+              </Flex>
+            </Box>
+          </Box>
+        </Portal>
       )}
     </Box>
   )

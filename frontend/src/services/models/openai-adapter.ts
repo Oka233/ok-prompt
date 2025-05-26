@@ -56,8 +56,12 @@ export class OpenAIAdapter implements ModelProvider {
       const completionTokens = response.usage?.completion_tokens || 0;
       const totalTokens = response.usage?.total_tokens || 0;
       
+      // 尝试提取reasoning_content
+      const thought = (response.choices[0] as any).reasoning_content || '';
+      
       return {
-        content: response.choices[0].message.content || '',
+        thought: thought,
+        answer: response.choices[0].message.content || '',
         usage: {
           promptTokens,
           completionTokens,
@@ -88,13 +92,22 @@ export class OpenAIAdapter implements ModelProvider {
       });
       
       let fullContent = '';
+      let thought = ''; // 用于累积推理内容
       
       for await (const chunk of stream) {
+        console.log('chunk', chunk);
+        // 处理推理内容
+        const reasoningContent = (chunk.choices?.[0]?.delta as any)?.reasoning_content;
+        if (reasoningContent) {
+          thought += reasoningContent;
+          callbacks.onContent(thought, fullContent);
+        }
+        
         // 处理内容更新
         if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0]?.delta?.content) {
           const content = chunk.choices[0].delta.content;
           fullContent += content;
-          callbacks.onContent(content);
+          callbacks.onContent(thought, fullContent);
         }
         
         // 处理token用量信息（在最后一个chunk中）
@@ -112,7 +125,7 @@ export class OpenAIAdapter implements ModelProvider {
       
       // 调用完成回调
       if (callbacks.onComplete) {
-        callbacks.onComplete(fullContent);
+        callbacks.onComplete(thought, fullContent);
       }
     } catch (error) {
       console.error('OpenAI流式API调用失败:', error);

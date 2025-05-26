@@ -41,7 +41,7 @@ const testModeOptions = createListCollection({
 
 const createModelListCollection = (models: ModelConfig[]) => {
   return createListCollection({
-    items: models.map(model => ({ label: model.name, value: model.id }))
+    items: models.map(model => ({ label: model.displayName, value: model.id }))
   });
 };
 

@@ -79,10 +79,9 @@ export function TestCaseTable() {
     
     return (
       <Table.Row>
-        <Table.ColumnHeader w="80px">序号</Table.ColumnHeader>
-        <Table.ColumnHeader w="150px">输入 (片段)</Table.ColumnHeader>
-        <Table.ColumnHeader w="150px">期望输出/指南</Table.ColumnHeader>
         {iterationHeaders}
+        <Table.ColumnHeader w="150px">输入</Table.ColumnHeader>
+        <Table.ColumnHeader w="150px">期望输出</Table.ColumnHeader>
       </Table.Row>
     );
   };
@@ -130,7 +129,7 @@ export function TestCaseTable() {
         <Table.Body>
           {currentTestCases.map(testCase => (
             <Table.Row key={testCase.id}>
-              <Table.Cell>{testCase.index}</Table.Cell>
+              {renderIterationResults(testCase)}
               <Table.Cell>
                 <Text 
                   fontSize="sm" 
@@ -153,7 +152,6 @@ export function TestCaseTable() {
                   {testCase.expectedOutput}
                 </Text>
               </Table.Cell>
-              {renderIterationResults(testCase)}
             </Table.Row>
           ))}
         </Table.Body>

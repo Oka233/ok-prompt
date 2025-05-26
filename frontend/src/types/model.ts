@@ -5,7 +5,8 @@ export interface ModelMessage {
 }
 
 export interface ModelResponse {
-  content: string;
+  thought: string;
+  answer: string;
   usage: {
     promptTokens: number;
     completionTokens: number;
@@ -18,8 +19,8 @@ export interface ModelOptions {
 }
 
 export interface StreamCallbacks {
-  onContent: (chunk: string) => void;
-  onComplete?: (fullContent: string) => void;
+  onContent: (thought: string, answer: string) => void;
+  onComplete?: (thought: string, answer: string) => void;
   onUsage?: (usage: {
     promptTokens: number;
     completionTokens: number;

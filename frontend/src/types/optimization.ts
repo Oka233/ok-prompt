@@ -21,11 +21,10 @@ export enum ModelType {
 export interface ModelConfig {
   id: string;
   name: string;
+  displayName: string;
   apiKey: string;
   baseUrl?: string;
   modelType: ModelType;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface TokenUsage {
@@ -68,9 +67,8 @@ export interface OptimizationTask {
   maxIterations: number;
   status: 'not_started' | 'in_progress' | 'completed' | 'max_iterations_reached' | 'paused';
   tokenBudget?: number;
-  tokenUsage: TokenUsage;
-  createdAt: string;
-  updatedAt: string;
+  targetModelTokenUsage: TokenUsage;
+  optimizationModelTokenUsage: TokenUsage;
   targetModelId?: string; // 目标模型ID
   optimizationModelId?: string; // 优化模型ID
   requireUserFeedback: boolean; // 是否需要用户反馈

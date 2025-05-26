@@ -8,10 +8,11 @@ import {
   useDisclosure,
   IconButton,
   RadioCard,
-  HStack,
   VStack,
+  Portal,
 } from '@chakra-ui/react'
 import { Table } from '@chakra-ui/react'
+import { toaster } from "@/components/ui/toaster"
 import { FiPlus, FiEdit2, FiTrash2, FiSave, FiXCircle } from 'react-icons/fi'
 import { useState, useRef } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
@@ -42,19 +43,23 @@ export function ModelManagement() {
   const [isEditing, setIsEditing] = useState(false)
   const [currentModel, setCurrentModel] = useState<ModelConfig | null>(null)
   const [modelName, setModelName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [selectedModelType, setSelectedModelType] = useState<ModelType>(ModelType.OPENAI)
   const [error, setError] = useState<string | null>(null)
   
-  const initialRef = useRef<HTMLInputElement>(null)
+  // 删除确认对话框状态
+  const [deleteModelId, setDeleteModelId] = useState<string | null>(null)
+  const { open: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
 
-  console.log(selectedModelType)
+  const initialRef = useRef<HTMLInputElement>(null)
   
   const handleAddModel = () => {
     setIsEditing(false)
     setCurrentModel(null)
     setModelName('')
+    setDisplayName('')
     setApiKey('')
     setBaseUrl('')
     setSelectedModelType(ModelType.OPENAI)
@@ -66,6 +71,7 @@ export function ModelManagement() {
     setIsEditing(true)
     setCurrentModel(model)
     setModelName(model.name)
+    setDisplayName(model.displayName)
     setApiKey(model.apiKey)
     setBaseUrl(model.baseUrl || '')
     setSelectedModelType(model.modelType)
@@ -76,9 +82,37 @@ export function ModelManagement() {
   const handleDeleteModel = async (id: string) => {
     try {
       await deleteModel(id)
-      alert('模型已删除')
+      toaster.create({
+        title: "删除成功",
+        description: "模型已成功删除",
+        type: "success",
+      })
     } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败')
+      toaster.create({
+        title: "删除失败",
+        description: err instanceof Error ? err.message : '删除失败',
+        type: "error",
+      })
+      console.error("删除模型失败:", err);
+    } finally {
+      setDeleteModelId(null)
+    }
+  }
+  
+  // 打开删除确认对话框
+  const openDeleteConfirm = (id: string) => {
+    setDeleteModelId(id)
+    onDeleteOpen()
+  }
+  
+  // 确认删除
+  const confirmDelete = async () => {
+    if (deleteModelId) {
+      try {
+        await handleDeleteModel(deleteModelId)
+      } finally {
+        onDeleteClose()
+      }
     }
   }
   
@@ -88,6 +122,22 @@ export function ModelManagement() {
     // 验证表单
     if (!modelName.trim()) {
       setError('请输入模型名称')
+      return
+    }
+    
+    if (!displayName.trim()) {
+      setError('请输入展示名称')
+      return
+    }
+    
+    // 检查展示名称是否重复
+    const duplicateDisplayName = models.find(m => 
+      m.displayName === displayName.trim() && 
+      (!isEditing || (isEditing && currentModel && m.id !== currentModel.id))
+    )
+    
+    if (duplicateDisplayName) {
+      setError('展示名称已存在，请使用其他名称')
       return
     }
     
@@ -106,18 +156,38 @@ export function ModelManagement() {
       if (isEditing && currentModel) {
         await updateModel(currentModel.id, {
           name: modelName,
+          displayName,
           apiKey,
           baseUrl: selectedModelType === ModelType.OPENAI_COMPATIBLE ? finalBaseUrl : undefined,
           modelType: selectedModelType
         })
-        alert('模型已更新')
+        toaster.create({
+          title: "更新成功",
+          description: "模型已成功更新",
+          type: "success",
+        })
       } else {
-        await addModel(modelName, apiKey, selectedModelType === ModelType.OPENAI_COMPATIBLE ? finalBaseUrl : '', selectedModelType)
-        alert('模型已添加')
+        await addModel(modelName, displayName, apiKey, selectedModelType === ModelType.OPENAI_COMPATIBLE ? finalBaseUrl : '', selectedModelType)
+        toaster.create({
+          title: "添加成功",
+          description: "模型已成功添加",
+          type: "success",
+        })
       }
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
+    }
+  }
+  
+  // 处理模型名称变化，自动设置展示名称
+  const handleModelNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value
+    setModelName(newName)
+    
+    // 如果是新建模型或展示名称为空，则自动设置展示名称
+    if (!isEditing || !displayName.trim()) {
+      setDisplayName(newName)
     }
   }
   
@@ -151,25 +221,80 @@ export function ModelManagement() {
         </Box>
       ) : (
         <Box overflowX="auto">
-          <Table.Root variant="line">
+          <Table.Root variant="line" tableLayout="fixed">
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>模型名称</Table.ColumnHeader>
+                <Table.ColumnHeader>展示名称</Table.ColumnHeader>
                 <Table.ColumnHeader>类型</Table.ColumnHeader>
                 <Table.ColumnHeader>API密钥</Table.ColumnHeader>
                 <Table.ColumnHeader>基础URL</Table.ColumnHeader>
-                <Table.ColumnHeader>创建时间</Table.ColumnHeader>
                 <Table.ColumnHeader width="100px">操作</Table.ColumnHeader>
               </Table.Row>
             </Table.Header>
             <Table.Body>
               {models.map(model => (
                 <Table.Row key={model.id}>
-                  <Table.Cell>{model.name}</Table.Cell>
-                  <Table.Cell>{getModelTypeName(model.modelType)}</Table.Cell>
-                  <Table.Cell>{maskApiKey(model.apiKey)}</Table.Cell>
-                  <Table.Cell>{model.baseUrl}</Table.Cell>
-                  <Table.Cell>{new Date(model.createdAt).toLocaleString()}</Table.Cell>
+                  <Table.Cell>
+                    <Text 
+                      fontSize="sm" 
+                      overflow="hidden" 
+                      textOverflow="ellipsis" 
+                      whiteSpace="nowrap"
+                      lineClamp="2"
+                      title={model.name}
+                    >
+                      {model.name}
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text 
+                      fontSize="sm" 
+                      overflow="hidden" 
+                      textOverflow="ellipsis" 
+                      whiteSpace="nowrap"
+                      lineClamp="2"
+                      title={model.displayName}
+                    >
+                      {model.displayName}
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text 
+                      fontSize="sm" 
+                      overflow="hidden" 
+                      textOverflow="ellipsis" 
+                      whiteSpace="nowrap"
+                      lineClamp="2"
+                      title={getModelTypeName(model.modelType)}
+                    >
+                      {getModelTypeName(model.modelType)}
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text 
+                      fontSize="sm" 
+                      overflow="hidden" 
+                      textOverflow="ellipsis" 
+                      whiteSpace="nowrap"
+                      lineClamp="2"
+                      title={maskApiKey(model.apiKey)}
+                    >
+                      {maskApiKey(model.apiKey)}
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text 
+                      fontSize="sm" 
+                      overflow="hidden" 
+                      textOverflow="ellipsis" 
+                      whiteSpace="nowrap"
+                      lineClamp="2"
+                      title={model.baseUrl}
+                    >
+                      {model.baseUrl}
+                    </Text>
+                  </Table.Cell>
                   <Table.Cell>
                     <Flex gap={2}>
                       <IconButton
@@ -182,11 +307,7 @@ export function ModelManagement() {
                       <IconButton
                         aria-label="删除"
                         size="sm"
-                        onClick={() => {
-                          if (window.confirm(`确定要删除模型 "${model.name}" 吗？`)) {
-                            handleDeleteModel(model.id)
-                          }
-                        }}
+                        onClick={() => openDeleteConfirm(model.id)}
                       >
                         <FiTrash2 />
                       </IconButton>
@@ -197,6 +318,60 @@ export function ModelManagement() {
             </Table.Body>
           </Table.Root>
         </Box>
+      )}
+      
+      {/* 删除确认对话框 */}
+      {isDeleteOpen && deleteModelId && (
+        <Portal>
+          <Box
+            position="fixed"
+            top="0"
+            left="0"
+            right="0"
+            bottom="0"
+            bg="rgba(0,0,0,0.4)"
+            zIndex="1000"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Box
+              bg="white"
+              borderRadius="md"
+              maxW="400px"
+              w="90%"
+              p={4}
+              position="relative"
+            >
+              <Heading size="sm" mb={3}>确认删除</Heading>
+              <Box position="absolute" top="10px" right="10px" cursor="pointer" onClick={onDeleteClose}>
+                ✕
+              </Box>
+              
+              <Text mb={2}>
+                确定要删除模型 "{models.find(m => m.id === deleteModelId)?.name}" 吗？
+              </Text>
+              <Text fontSize="sm" color="gray.500" mb={4}>
+                如果有任务正在使用此模型，将无法删除。
+              </Text>
+              
+              <Flex justifyContent="flex-end" gap={3}>
+                <Button size="sm" variant="outline" onClick={onDeleteClose}>
+                  <FiXCircle />
+                  取消
+                </Button>
+                <Button 
+                  size="sm" 
+                  colorScheme="red" 
+                  onClick={confirmDelete}
+                >
+                  <FiTrash2 />
+                  删除
+                </Button>
+              </Flex>
+            </Box>
+          </Box>
+        </Portal>
       )}
       
       {/* 添加/编辑模型对话框 */}
@@ -266,7 +441,16 @@ export function ModelManagement() {
                     ref={initialRef}
                     placeholder="例如: GPT-4"
                     value={modelName}
-                    onChange={(e) => setModelName(e.target.value)}
+                    onChange={handleModelNameChange}
+                  />
+                </Box>
+
+                <Box mb={4}>
+                  <Text mb={2} fontWeight="medium">展示名称 *</Text>
+                  <Input
+                    placeholder="用于界面显示的名称"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
                   />
                 </Box>
 

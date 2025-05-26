@@ -87,7 +87,8 @@ export class GoogleAdapter implements ModelProvider {
       const totalTokens = response.usageMetadata?.totalTokenCount ?? 0;
       
       return {
-        content: thoughts + answer,
+        thought: thoughts,
+        answer: answer,
         usage: {
           promptTokens,
           completionTokens,
@@ -111,43 +112,61 @@ export class GoogleAdapter implements ModelProvider {
     try {
       const { geminiContents, systemInstruction } = this.convertMessages(messages);
       
-      // 发送流式请求
+      // 创建流式响应
       const stream = await this.client.models.generateContentStream({
         model: this.modelName,
         contents: geminiContents,
         config: {
           systemInstruction,
+          thinkingConfig: {
+            includeThoughts: true,
+          },
           ...options,
         },
       });
       
       let fullContent = '';
+      let thoughts = '';
+      let answer = '';
       
       // 处理流式响应
       for await (const chunk of stream) {
-        // 处理内容更新
-        if (chunk.text) {
-          fullContent += chunk.text;
-          callbacks.onContent(chunk.text);
+        // 处理思考内容
+        const thoughtParts = chunk.candidates?.[0]?.content?.parts?.filter((p: any) => {
+          return p.text && p.thought
+        });
+        
+        if (thoughtParts && thoughtParts.length > 0) {
+          const thoughtText = thoughtParts[0].text || '';
+          thoughts += thoughtText;
+          callbacks.onContent(thoughts, answer);
         }
         
-        // 处理token用量信息（可能在最后一个chunk中）
-        if (chunk.usageMetadata) {
+        // 处理回答内容
+        const answerParts = chunk.candidates?.[0]?.content?.parts?.filter((p: any) => {
+          return p.text && !p.thought
+        });
+        
+        if (answerParts && answerParts.length > 0) {
+          const content = answerParts[0].text || '';
+          answer += content;
+          callbacks.onContent(thoughts, answer);
+        }
+        
+        // 处理用量信息
+        if (chunk.usageMetadata && callbacks.onUsage) {
           const usage = {
             promptTokens: chunk.usageMetadata.promptTokenCount || 0,
-            completionTokens: chunk.usageMetadata.candidatesTokenCount || 0,
-            totalTokens: (chunk.usageMetadata.promptTokenCount || 0) + 
-                         (chunk.usageMetadata.candidatesTokenCount || 0)
+            completionTokens: (chunk.usageMetadata.candidatesTokenCount || 0) + (chunk.usageMetadata.thoughtsTokenCount || 0),
+            totalTokens: chunk.usageMetadata.totalTokenCount || 0
           };
-          if (callbacks.onUsage) {
-            callbacks.onUsage(usage);
-          }
+          callbacks.onUsage(usage);
         }
       }
       
       // 调用完成回调
       if (callbacks.onComplete) {
-        callbacks.onComplete(fullContent);
+        callbacks.onComplete(thoughts, answer);
       }
     } catch (error) {
       console.error('Google Gemini流式API调用失败:', error);

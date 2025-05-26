@@ -12,6 +12,7 @@ import { useState } from 'react'
 import { BiChevronDown } from 'react-icons/bi'
 import { useCurrentPromptIterations } from '@/store/useOptimizationStore'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
+import { toaster } from "@/components/ui/toaster"
 
 export function PromptIterationList() {
   const currentPromptIterations = useCurrentPromptIterations()
@@ -51,13 +52,26 @@ export function PromptIterationList() {
   const handleSubmitFeedback = async (iterationId: string) => {
     const feedback = feedbackInputs[iterationId]
     if (!feedback?.trim()) {
-      alert('请输入反馈内容')
+      toaster.create({
+        title: "提交失败",
+        description: "请输入反馈内容",
+        type: "error",
+      })
       return
     }
     try {
       await submitUserFeedback(currentTask?.id || '', iterationId, feedback)
+      toaster.create({
+        title: "提交成功",
+        description: "反馈已成功提交",
+        type: "success",
+      })
     } catch (error) {
-      alert(error instanceof Error ? error.message : '提交反馈失败')
+      toaster.create({
+        title: "提交失败",
+        description: error instanceof Error ? error.message : '提交反馈失败',
+        type: "error",
+      })
     }
   }
 

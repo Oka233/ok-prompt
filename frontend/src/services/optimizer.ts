@@ -86,7 +86,7 @@ export async function executeTests({
       // 调用目标LLM
       const response = await model.generateCompletion(messages);
       
-      const actualOutput = response.content;
+      const actualOutput = response.answer;
       
       // 记录结果
       results.push({
@@ -180,7 +180,7 @@ export async function evaluateResults({
       const messages: ModelMessage[] = [{ role: 'user', content: evaluationPrompt }];
       const response = await model.generateCompletion(messages);
       
-      const evalResponse = response.content;
+      const evalResponse = response.answer;
       
       // 解析评分和评估理由
       const { score, reasoning } = parseEvaluationResponse(evalResponse);
@@ -316,14 +316,18 @@ export async function summarizeEvaluation({
       await model.generateCompletionStream(
         messages,
         {
-          onContent: (chunk) => {
-            fullContent += chunk;
+          onContent: (thought, answer) => {
+            if (!answer) {
+              fullContent = thought;
+            } else {
+              fullContent = answer;
+            }
             onProgress(fullContent);
           },
           onUsage: (usage) => {
             tokenUsage = usage;
           },
-          onComplete: (content) => {
+          onComplete: (thought, answer) => {
             // 完成时的处理（可选）
           }
         }
@@ -344,7 +348,7 @@ export async function summarizeEvaluation({
         avgScore,
         perfectScoreCount: perfectScores,
         totalCases,
-        summaryReport: response.content,
+        summaryReport: response.answer, // 使用answer部分
         tokenUsage: {
           promptTokens: response.usage.promptTokens,
           completionTokens: response.usage.completionTokens,
@@ -460,15 +464,19 @@ export async function optimizePrompt({
       await model.generateCompletionStream(
         messages,
         {
-          onContent: (chunk) => {
-            fullContent += chunk;
+          onContent: (thought, answer) => {
+            if (!answer) {
+              fullContent = thought;
+            } else {
+              fullContent = answer;
+            }
             const cleanedPartialPrompt = cleanOptimizedPrompt(fullContent);
             onProgress(cleanedPartialPrompt);
           },
           onUsage: (usage) => {
             tokenUsage = usage;
           },
-          onComplete: (content) => {
+          onComplete: (thought, answer) => {
             // 完成时的处理（可选）
           }
         }
@@ -481,7 +489,7 @@ export async function optimizePrompt({
     } else {
       // 使用非流式API
       const response = await model.generateCompletion(messages);
-      const newPrompt = cleanOptimizedPrompt(response.content);
+      const newPrompt = cleanOptimizedPrompt(response.answer); // 使用answer部分
       
       return {
         newPrompt,

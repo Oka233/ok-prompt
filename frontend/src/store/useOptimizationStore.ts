@@ -50,7 +50,7 @@ interface OptimizationState {
   stopOptimization: (taskId: string) => Promise<void>;
 
   // 模型管理
-  addModel: (name: string, apiKey: string, baseUrl: string, modelType: ModelType) => Promise<void>;
+  addModel: (name: string, displayName: string, apiKey: string, baseUrl: string, modelType: ModelType) => Promise<void>;
   updateModel: (id: string, data: Partial<ModelConfig>) => Promise<void>;
   deleteModel: (id: string) => Promise<void>;
 
@@ -107,15 +107,18 @@ export const useOptimizationStore = create<OptimizationState>()(
             datasetName: '手动创建',
             testSet,
             maxIterations,
-            status: 'not_started',
+            status: 'not_started' as const,
             tokenBudget,
-            tokenUsage: {
+            targetModelTokenUsage: {
               promptTokens: 0,
               completionTokens: 0,
               totalTokens: 0
             },
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            optimizationModelTokenUsage: {
+              promptTokens: 0,
+              completionTokens: 0,
+              totalTokens: 0
+            },
             targetModelId,
             optimizationModelId,
             requireUserFeedback,
@@ -227,8 +230,7 @@ export const useOptimizationStore = create<OptimizationState>()(
               t.id === taskId 
                 ? { 
                     ...t, 
-                    status: 'in_progress',
-                    updatedAt: new Date().toISOString() 
+                    status: 'in_progress' as const
                   }
                 : t
             )
@@ -243,7 +245,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             set(state => ({
               tasks: state.tasks.map(t =>
                   t.id === taskId
-                      ? { ...t, status: 'max_iterations_reached', updatedAt: new Date().toISOString() }
+                      ? { ...t, status: 'max_iterations_reached' as const }
                       : t
               ),
             }));
@@ -285,8 +287,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                     t.id === taskId
                       ? {
                         ...t,
-                        promptIterations: [...t.promptIterations, currentPromptIteration],
-                        updatedAt: new Date().toISOString()
+                        promptIterations: [...t.promptIterations, currentPromptIteration]
                       }
                       : t
                   )
@@ -346,8 +347,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                       t.id === taskId
                         ? {
                           ...t,
-                          promptIterations: updatedIterations,
-                          updatedAt: new Date().toISOString()
+                          promptIterations: updatedIterations
                         }
                         : t
                     )
@@ -379,8 +379,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                           t.id === taskId
                             ? {
                               ...t,
-                              promptIterations: updatedIterations,
-                              updatedAt: new Date().toISOString()
+                              promptIterations: updatedIterations
                             }
                             : t
                         )
@@ -396,9 +395,9 @@ export const useOptimizationStore = create<OptimizationState>()(
 
                   // 更新token用量
                   const updatedTokenUsage = {
-                    promptTokens: t.tokenUsage.promptTokens + optimizationResult.tokenUsage.promptTokens,
-                    completionTokens: t.tokenUsage.completionTokens + optimizationResult.tokenUsage.completionTokens,
-                    totalTokens: t.tokenUsage.totalTokens + optimizationResult.tokenUsage.totalTokens
+                    promptTokens: t.optimizationModelTokenUsage.promptTokens + optimizationResult.tokenUsage.promptTokens,
+                    completionTokens: t.optimizationModelTokenUsage.completionTokens + optimizationResult.tokenUsage.completionTokens,
+                    totalTokens: t.optimizationModelTokenUsage.totalTokens + optimizationResult.tokenUsage.totalTokens
                   };
 
                   // 更新迭代记录的最终状态
@@ -417,9 +416,8 @@ export const useOptimizationStore = create<OptimizationState>()(
                       t.id === taskId
                         ? {
                           ...t,
-                          tokenUsage: updatedTokenUsage,
-                          promptIterations: updatedIterations,
-                          updatedAt: new Date().toISOString()
+                          optimizationModelTokenUsage: updatedTokenUsage,
+                          promptIterations: updatedIterations
                         }
                         : t
                     )
@@ -482,9 +480,9 @@ export const useOptimizationStore = create<OptimizationState>()(
                   
                   // 更新总token用量
                   const updatedTokenUsage = {
-                    promptTokens: t.tokenUsage.promptTokens + testTokenUsage.promptTokens,
-                    completionTokens: t.tokenUsage.completionTokens + testTokenUsage.completionTokens,
-                    totalTokens: t.tokenUsage.totalTokens + testTokenUsage.totalTokens
+                    promptTokens: t.targetModelTokenUsage.promptTokens + testTokenUsage.promptTokens,
+                    completionTokens: t.targetModelTokenUsage.completionTokens + testTokenUsage.completionTokens,
+                    totalTokens: t.targetModelTokenUsage.totalTokens + testTokenUsage.totalTokens
                   };
                   
                   rawTestResults.forEach((result, index) => {
@@ -503,14 +501,13 @@ export const useOptimizationStore = create<OptimizationState>()(
                         t.id === taskId
                             ? {
                               ...t,
-                              tokenUsage: updatedTokenUsage,
+                              targetModelTokenUsage: updatedTokenUsage,
                               testCases: updatedTestCases,
                               promptIterations: t.promptIterations.map(pi =>
                                   pi.iteration === currentIteration
-                                      ? { ...pi, stage: 'tested' }
+                                      ? { ...pi, stage: 'tested' as const }
                                       : pi
-                              ),
-                              updatedAt: new Date().toISOString()
+                              )
                             }
                             : t
                     )
@@ -573,9 +570,9 @@ export const useOptimizationStore = create<OptimizationState>()(
                   
                   // 更新总token用量
                   const updatedTokenUsage = {
-                    promptTokens: t.tokenUsage.promptTokens + evaluationTokenUsage.promptTokens,
-                    completionTokens: t.tokenUsage.completionTokens + evaluationTokenUsage.completionTokens,
-                    totalTokens: t.tokenUsage.totalTokens + evaluationTokenUsage.totalTokens
+                    promptTokens: t.optimizationModelTokenUsage.promptTokens + evaluationTokenUsage.promptTokens,
+                    completionTokens: t.optimizationModelTokenUsage.completionTokens + evaluationTokenUsage.completionTokens,
+                    totalTokens: t.optimizationModelTokenUsage.totalTokens + evaluationTokenUsage.totalTokens
                   };
                   
                   evaluatedResults.forEach((result, index) => {
@@ -595,14 +592,13 @@ export const useOptimizationStore = create<OptimizationState>()(
                         t.id === taskId
                             ? {
                               ...t,
-                              tokenUsage: updatedTokenUsage,
+                              optimizationModelTokenUsage: updatedTokenUsage,
                               testCases: updatedTestCases,
                               promptIterations: t.promptIterations.map(pi =>
                                   pi.iteration === currentIteration
-                                      ? { ...pi, stage: 'evaluated' }
+                                      ? { ...pi, stage: 'evaluated' as const }
                                       : pi
-                              ),
-                              updatedAt: new Date().toISOString()
+                              )
                             }
                             : t
                     )
@@ -641,8 +637,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                       t.id === taskId
                           ? {
                             ...t,
-                            promptIterations: updatedIterations,
-                            updatedAt: new Date().toISOString()
+                            promptIterations: updatedIterations
                           }
                           : t
                   )
@@ -679,8 +674,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                           t.id === taskId
                               ? {
                                 ...t,
-                                promptIterations: updatedIterations,
-                                updatedAt: new Date().toISOString()
+                                promptIterations: updatedIterations
                               }
                               : t
                       )
@@ -699,9 +693,9 @@ export const useOptimizationStore = create<OptimizationState>()(
 
                 // 更新token用量
                 const updatedTokenUsage = {
-                  promptTokens: t.tokenUsage.promptTokens + summary.tokenUsage.promptTokens,
-                  completionTokens: t.tokenUsage.completionTokens + summary.tokenUsage.completionTokens,
-                  totalTokens: t.tokenUsage.totalTokens + summary.tokenUsage.totalTokens
+                  promptTokens: t.optimizationModelTokenUsage.promptTokens + summary.tokenUsage.promptTokens,
+                  completionTokens: t.optimizationModelTokenUsage.completionTokens + summary.tokenUsage.completionTokens,
+                  totalTokens: t.optimizationModelTokenUsage.totalTokens + summary.tokenUsage.totalTokens
                 };
 
                 // 更新迭代记录的最终状态
@@ -724,9 +718,8 @@ export const useOptimizationStore = create<OptimizationState>()(
                       t.id === taskId
                           ? {
                             ...t,
-                            tokenUsage: updatedTokenUsage,
-                            promptIterations: updatedIterations,
-                            updatedAt: new Date().toISOString()
+                            optimizationModelTokenUsage: updatedTokenUsage,
+                            promptIterations: updatedIterations
                           }
                           : t
                   )
@@ -741,8 +734,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                     t.id === taskId 
                       ? { 
                           ...t, 
-                          status: 'completed',
-                          updatedAt: new Date().toISOString() 
+                          status: 'completed' as const
                         }
                       : t
                   )
@@ -764,8 +756,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
                 const updatedTask = {
                   ...t,
-                  status: 'in_progress',
-                  updatedAt: new Date().toISOString(),
+                  status: 'in_progress' as const
                 } as OptimizationTask;
                 
                 return {
@@ -781,8 +772,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                     t.id === taskId 
                       ? { 
                           ...t, 
-                          status: 'paused',
-                          updatedAt: new Date().toISOString() 
+                          status: 'paused' as const
                         }
                       : t
                   )
@@ -798,8 +788,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                     t.id === taskId 
                       ? { 
                           ...t, 
-                          status: 'max_iterations_reached',
-                          updatedAt: new Date().toISOString() 
+                          status: 'max_iterations_reached' as const
                         }
                       : t
                   )
@@ -817,7 +806,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 set(state => ({
                   tasks: state.tasks.map(t => 
                     t.id === taskId 
-                      ? { ...t, status: 'paused', updatedAt: new Date().toISOString() }
+                      ? { ...t, status: 'paused' as const }
                       : t
                   )
                 }));
@@ -829,7 +818,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 error: (error as Error).message,
                 tasks: state.tasks.map(t => 
                   t.id === taskId 
-                    ? { ...t, status: 'paused', updatedAt: new Date().toISOString() }
+                    ? { ...t, status: 'paused' as const }
                     : t
                 )
               }));
@@ -846,7 +835,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             set(state => ({
               tasks: state.tasks.map(t => 
                 t.id === taskId 
-                  ? { ...t, status: 'paused', updatedAt: new Date().toISOString() }
+                  ? { ...t, status: 'paused' as const }
                   : t
               )
             }));
@@ -856,7 +845,7 @@ export const useOptimizationStore = create<OptimizationState>()(
               error: (error as Error).message,
               tasks: get().tasks.map(t => 
                 t.id === taskId 
-                  ? { ...t, status: 'not_started', updatedAt: new Date().toISOString() }
+                  ? { ...t, status: 'not_started' as const }
                   : t
               )
             });
@@ -874,7 +863,7 @@ export const useOptimizationStore = create<OptimizationState>()(
           set(state => ({
             tasks: state.tasks.map(task => 
               task.id === taskId 
-                ? { ...task, status: 'paused', updatedAt: new Date().toISOString() }
+                ? { ...task, status: 'paused' as const }
                 : task
             ),
           }));
@@ -910,18 +899,17 @@ export const useOptimizationStore = create<OptimizationState>()(
         }
       },
       
-      // 模型管理 (保持不变,仅列出)
-      addModel: async (name, apiKey, baseUrl, modelType) => {
+      // 模型管理
+      addModel: async (name, displayName, apiKey, baseUrl, modelType) => {
         set({ error: null });
         try {
           const newModel: ModelConfig = {
             id: crypto.randomUUID(),
             name,
+            displayName,
             apiKey,
             baseUrl,
             modelType,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
           };
           set(state => ({ 
             models: [...state.models, newModel],
@@ -937,7 +925,7 @@ export const useOptimizationStore = create<OptimizationState>()(
           set(state => ({
             models: state.models.map(model => 
               model.id === id 
-                ? { ...model, ...data, updatedAt: new Date().toISOString() }
+                ? { ...model, ...data }
                 : model
             ),
           }));
@@ -954,7 +942,9 @@ export const useOptimizationStore = create<OptimizationState>()(
               task => task.targetModelId === id || task.optimizationModelId === id
             );
             if (tasksUsingModel.length > 0) {
-              throw new Error(`无法删除模型，有 ${tasksUsingModel.length} 个任务正在使用它`);
+              // 构建使用该模型的任务名称列表
+              const taskNames = tasksUsingModel.map(task => `"${task.name}"`).join(', ');
+              throw new Error(`无法删除模型，以下${tasksUsingModel.length}个任务正在使用它: ${taskNames}`);
             }
             return {
               models: state.models.filter(model => model.id !== id),
@@ -963,15 +953,16 @@ export const useOptimizationStore = create<OptimizationState>()(
           console.log(`已删除模型: ${id}`);
         } catch (error) {
           set({ error: (error as Error).message });
+          throw error; // 重新抛出错误，让UI层可以捕获
         }
       },
       
-      // 任务模型关联 (保持不变,仅列出)
+      // 任务模型关联
       updateTaskModels: async (taskId, targetModelId, optimizationModelId) => {
         set(state => ({
           tasks: state.tasks.map(task => 
             task.id === taskId 
-              ? { ...task, targetModelId, optimizationModelId, updatedAt: new Date().toISOString() }
+              ? { ...task, targetModelId, optimizationModelId }
               : task
           )
         }));
@@ -981,7 +972,7 @@ export const useOptimizationStore = create<OptimizationState>()(
         set(state => ({
           tasks: state.tasks.map(task => 
             task.id === taskId 
-              ? { ...task, requireUserFeedback, updatedAt: new Date().toISOString() }
+              ? { ...task, requireUserFeedback }
               : task
           )
         }));
@@ -1005,8 +996,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                       };
                     }
                     return iteration;
-                  }),
-                  updatedAt: new Date().toISOString()
+                  })
                 };
               }
               return task;
@@ -1029,8 +1019,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                     return { ...iter, showReport: false };
                   }
                   return iter;
-                }),
-                updatedAt: new Date().toISOString(),
+                })
               };
             }
             return task;
@@ -1055,8 +1044,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                     ...iter,
                     showReport: iter.id === iterationId
                   };
-                }),
-                updatedAt: new Date().toISOString(),
+                })
               };
             }
             return t;
@@ -1084,7 +1072,7 @@ if (typeof window !== 'undefined') {
     useOptimizationStore.setState(state => {
       const updatedTasks = state.tasks.map(task => 
         task.status === 'in_progress' 
-          ? { ...task, status: 'paused' as 'paused', updatedAt: new Date().toISOString() } 
+          ? { ...task, status: 'paused' as const } 
           : task
       );
       console.log('Browser closing/refreshing, paused in-progress tasks.');
