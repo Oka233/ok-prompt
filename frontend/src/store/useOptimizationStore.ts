@@ -6,7 +6,9 @@ import {
   evaluateResults,
   summarizeEvaluation,
   optimizePrompt,
-  InputTestResult
+  InputTestResult,
+  TestResult,
+  EvaluationResult
 } from '@/services/optimizer';
 import { toaster } from "@/components/ui/toaster";
 import { ModelFactory } from '@/services/models/model-factory';
@@ -35,12 +37,13 @@ interface OptimizationState {
   models: ModelConfig[];
   
   // 任务管理
-  createTask: (name: string, testSet: TestSet, initialPrompt: string, maxIterations?: number, tokenBudget?: number, targetModelId?: string, optimizationModelId?: string, requireUserFeedback?: boolean) => Promise<void>;
+  createTask: (name: string, testSet: TestSet, initialPrompt: string, maxIterations?: number, tokenBudget?: number, targetModelId?: string, optimizationModelId?: string, requireUserFeedback?: boolean, concurrentCalls?: number) => Promise<void>;
   loadTasks: () => Promise<void>;
   selectTask: (taskId: string) => void;
   deleteTask: (taskId: string) => Promise<void>;
   updateTaskModels: (taskId: string, targetModelId?: string, optimizationModelId?: string) => Promise<void>;
   updateTaskFeedbackSetting: (taskId: string, requireUserFeedback: boolean) => Promise<void>;
+  updateTaskConcurrentCalls: (taskId: string, concurrentCalls: number) => Promise<void>;
   
   // 视图控制
   setViewState: (state: ViewState) => void;
@@ -80,7 +83,7 @@ export const useOptimizationStore = create<OptimizationState>()(
       },
       
       // 任务管理
-      createTask: async (name, testSet, initialPrompt, maxIterations = 20, tokenBudget, targetModelId, optimizationModelId, requireUserFeedback = false) => {
+      createTask: async (name, testSet, initialPrompt, maxIterations = 20, tokenBudget, targetModelId, optimizationModelId, requireUserFeedback = false, concurrentCalls = 3) => {
         set({ error: null });
         try {
           const initialTestCases: TestCaseResult[] = testSet.data.map((tc, index) => ({
@@ -98,7 +101,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             avgScore: null,
             reportSummary: '尚未生成',
             waitingForFeedback: requireUserFeedback,
-            stage: 'not_started'
+            stage: 'generated'
           };
 
           const newTask: OptimizationTask = {
@@ -122,6 +125,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             targetModelId,
             optimizationModelId,
             requireUserFeedback,
+            concurrentCalls,
             testCases: initialTestCases,
             promptIterations: [initialPromptIteration]
           };
@@ -271,7 +275,7 @@ export const useOptimizationStore = create<OptimizationState>()(
 
               const currentIteration = latestIteration.stage !== 'summarized' ? task.promptIterations.length - 1 : task.promptIterations.length;
 
-              const currentPromptIteration = latestIteration.stage !== 'summarized' ? latestIteration : {
+              let currentPromptIteration = latestIteration.stage !== 'summarized' ? latestIteration : {
                 id: crypto.randomUUID(),
                 iteration: currentIteration,
                 prompt: '',
@@ -318,7 +322,8 @@ export const useOptimizationStore = create<OptimizationState>()(
               const previousIteration = task.promptIterations[task.promptIterations.length - 2];
 
               let currentPrompt = currentPromptIteration.prompt;
-              if (!currentPromptIteration.prompt) {
+              if (currentPromptIteration.stage === 'not_started') {
+                
                 toaster.update(toasterId as string, {
                   description: `正在生成提示词`,
                 });
@@ -451,84 +456,138 @@ export const useOptimizationStore = create<OptimizationState>()(
                 return;
               }
 
-              let isTested = true;
-              task.testCases.forEach(tc => {
-                if (tc.iterationResults.length <= currentIteration) {
-                  isTested = false;
-                }
-              });
-              let testResults: InputTestResult[];
-              if (isTested) {
-                testResults = task.testCases.map(tc => ({
+              currentPromptIteration = get().tasks.find(t => t.id === taskId)?.promptIterations.find(pi => pi.iteration === currentIteration) as PromptIteration;
+              let testResults: InputTestResult[] = task.testCases.map(tc => {
+                if (tc.iterationResults.length > currentIteration) {
+                  // 已有结果的用例直接使用
+                  return {
                     input: tc.input,
                     expectedOutput: tc.expectedOutput,
                     actualOutput: tc.iterationResults[currentIteration].output,
                     score: tc.iterationResults[currentIteration].score,
                     comment: tc.iterationResults[currentIteration].comment,
-                }));
-              } else {
+                  };
+                } else {
+                  // 未测试的用例初始化为null
+                  return {
+                    input: tc.input,
+                    expectedOutput: tc.expectedOutput,
+                    actualOutput: '',
+                    score: null,
+                    comment: null,
+                  };
+                }
+              });
+              console.log("当前测试结果:", testResults);
+              if (currentPromptIteration.stage === 'generated') {
                 toaster.update(toasterId as string, {
                   description: `正在推理测试用例结果`,
                 });
-                const rawTestResults = await executeTests({
-                  prompt: currentPrompt,
-                  testCases: task.testSet.data,
-                  model: targetModelInstance,
-                  isCancelled: () => get().tasks.find(t => t.id === taskId)?.status === 'paused',
-                });
 
-                testResults = rawTestResults.map((result, index) => ({
-                    input: task.testSet.data[index].input,
-                    expectedOutput: task.testSet.data[index].output,
-                    actualOutput: result.actualOutput,
-                    score: null, // 初始化为null，表示等待评估
-                    comment: result.comment,
-                }));
-
-                // 更新测试阶段和测试结果
-                set(state => {
-                  const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
-                  const updatedTestCases = [...t.testCases];
-                  
-                  // 计算本次测试的token用量
-                  const testTokenUsage = rawTestResults.reduce((total, result) => ({
-                    promptTokens: total.promptTokens + (result.tokenUsage?.promptTokens || 0),
-                    completionTokens: total.completionTokens + (result.tokenUsage?.completionTokens || 0),
-                    totalTokens: total.totalTokens + (result.tokenUsage?.totalTokens || 0)
-                  }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
-                  
-                  // 更新总token用量
-                  const updatedTokenUsage = {
-                    promptTokens: t.targetModelTokenUsage.promptTokens + testTokenUsage.promptTokens,
-                    completionTokens: t.targetModelTokenUsage.completionTokens + testTokenUsage.completionTokens,
-                    totalTokens: t.targetModelTokenUsage.totalTokens + testTokenUsage.totalTokens
-                  };
-                  
-                  rawTestResults.forEach((result, index) => {
-                    if (updatedTestCases[index]) {
-                      updatedTestCases[index].iterationResults.push({
+                // 处理单个测试用例完成时的回调
+                const handleSingleTestComplete = (result: TestResult, index: number) => {
+                  const testCaseIndex = task.testCases.findIndex(tc => tc.index === index + 1);
+                  if (testCaseIndex !== -1) {
+                    // 每完成一个测试用例就更新状态
+                    set(state => {
+                      const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                      const updatedTestCases = [...t.testCases];
+                      
+                      // 更新总token用量
+                      const updatedTokenUsage = {
+                        promptTokens: t.targetModelTokenUsage.promptTokens + result.tokenUsage.promptTokens,
+                        completionTokens: t.targetModelTokenUsage.completionTokens + result.tokenUsage.completionTokens,
+                        totalTokens: t.targetModelTokenUsage.totalTokens + result.tokenUsage.totalTokens
+                      };
+                      
+                      updatedTestCases[testCaseIndex].iterationResults.push({
                         iteration: currentIteration,
                         output: result.actualOutput,
-                        score: null, // 初始化为null，表示等待评估
-                        comment: result.comment,
+                        score: null,
+                        comment: '',
                       });
-                    }
-                  });
 
-                  return {
-                    tasks: state.tasks.map(t =>
-                        t.id === taskId
+                      // 更新测试结果数组
+                      testResults[testCaseIndex] = {
+                        input: result.input,
+                        expectedOutput: result.expectedOutput,
+                        actualOutput: result.actualOutput,
+                        score: null,
+                        comment: '',
+                      };
+
+                      return {
+                        tasks: state.tasks.map(t =>
+                          t.id === taskId
                             ? {
                               ...t,
                               targetModelTokenUsage: updatedTokenUsage,
                               testCases: updatedTestCases,
-                              promptIterations: t.promptIterations.map(pi =>
-                                  pi.iteration === currentIteration
-                                      ? { ...pi, stage: 'tested' as const }
-                                      : pi
-                              )
                             }
                             : t
+                        )
+                      };
+                    });
+
+                    // 更新UI提示
+                    const completedCount = task.testCases.filter(tc => 
+                      tc.iterationResults.length > currentIteration
+                    ).length;
+                    toaster.update(toasterId as string, {
+                      description: `正在推理测试用例结果 (${completedCount}/${task.testCases.length})`,
+                    });
+                  }
+                };
+
+                // 过滤掉已经测试过的用例，只执行未测试的用例
+                const pendingTestCases = task.testSet.data.filter((_, index) => {
+                  const testCase = task.testCases[index];
+                  return !testCase.iterationResults.some(r => r.iteration === currentIteration);
+                });
+
+                // 创建一个映射数组，用于将过滤后的索引映射回原始索引
+                const indexMapping: number[] = [];
+                task.testSet.data.forEach((_, originalIndex) => {
+                  const testCase = task.testCases[originalIndex];
+                  if (!testCase.iterationResults.some(r => r.iteration === currentIteration)) {
+                    indexMapping.push(originalIndex);
+                  }
+                });
+
+                // 修改回调函数，使用映射数组将过滤后的索引映射回原始索引
+                const mappedHandleSingleTestComplete = (result: TestResult, filteredIndex: number) => {
+                  const originalIndex = indexMapping[filteredIndex];
+                  handleSingleTestComplete(result, originalIndex);
+                };
+
+                if (pendingTestCases.length > 0) {
+                  // 执行测试，传入当前任务的并发调用数，只测试未测试的用例
+                  await executeTests({
+                    prompt: currentPrompt,
+                    testCases: pendingTestCases,
+                    model: targetModelInstance,
+                    isCancelled: () => get().tasks.find(t => t.id === taskId)?.status === 'paused',
+                    concurrentLimit: task.concurrentCalls,
+                    onSingleTestComplete: mappedHandleSingleTestComplete,
+                  });
+                } else {
+                  console.log("[runIteration] 所有测试用例已完成，跳过测试阶段");
+                }
+
+                // 确保所有测试用例都有结果
+                set(state => {
+                  return {
+                    tasks: state.tasks.map(t =>
+                      t.id === taskId
+                        ? {
+                          ...t,
+                          promptIterations: t.promptIterations.map(pi =>
+                            pi.iteration === currentIteration
+                              ? { ...pi, stage: 'tested' as const }
+                              : pi
+                          )
+                        }
+                        : t
                     )
                   };
                 });
@@ -541,85 +600,126 @@ export const useOptimizationStore = create<OptimizationState>()(
                 return;
               }
 
-              let isEvaluated = true;
-              task.testCases.forEach(tc => {
-                if (tc.iterationResults[currentIteration].score === null) {
-                  isEvaluated = false;
-                }
-              });
-              if (isEvaluated) {
-                testResults.forEach((result, index) => {
-                    if (task.testCases[index]) {
-                        task.testCases[index].iterationResults[currentIteration].score = result.score;
-                        task.testCases[index].iterationResults[currentIteration].comment = result.comment || '';
-                    }
-                });
-              } else {
+              currentPromptIteration = get().tasks.find(t => t.id === taskId)?.promptIterations.find(pi => pi.iteration === currentIteration) as PromptIteration;
+              if (currentPromptIteration.stage === 'tested') {
                 toaster.update(toasterId as string, {
                   description: `正在评估测试用例结果`,
                 });
                 console.log('评估测试结果...');
-                console.log(testResults);
-                const evaluatedResults = await evaluateResults({
-                  prompt: currentPrompt,
-                  testResults,
-                  testMode: task.testSet.mode,
-                  model: optimizationModelInstance,
-                  isCancelled: () => get().tasks.find(t => t.id === taskId)?.status === 'paused',
-                });
-
-                evaluatedResults.forEach((result, index) => {
-                  testResults[index].score = result.score;
-                  testResults[index].comment = result.comment || '';
-                });
-
-                console.log(evaluatedResults)
-
-                // 更新评估阶段和评估结果
-                set(state => {
-                  const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
-                  const updatedTestCases = [...t.testCases];
-                  
-                  // 计算本次评估的token用量
-                  const evaluationTokenUsage = evaluatedResults.reduce((total, result) => ({
-                    promptTokens: total.promptTokens + (result.tokenUsage?.promptTokens || 0),
-                    completionTokens: total.completionTokens + (result.tokenUsage?.completionTokens || 0),
-                    totalTokens: total.totalTokens + (result.tokenUsage?.totalTokens || 0)
-                  }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
-                  
-                  // 更新总token用量
-                  const updatedTokenUsage = {
-                    promptTokens: t.optimizationModelTokenUsage.promptTokens + evaluationTokenUsage.promptTokens,
-                    completionTokens: t.optimizationModelTokenUsage.completionTokens + evaluationTokenUsage.completionTokens,
-                    totalTokens: t.optimizationModelTokenUsage.totalTokens + evaluationTokenUsage.totalTokens
-                  };
-                  
-                  evaluatedResults.forEach((result, index) => {
-                    if (updatedTestCases[index]) {
-                      const lastResult = updatedTestCases[index].iterationResults[updatedTestCases[index].iterationResults.length - 1];
-                      if (lastResult) {
-                        lastResult.score = result.score;
-                        lastResult.comment = result.comment || '';
+                
+                // 处理单个评估完成时的回调
+                const handleSingleEvaluationComplete = (result: EvaluationResult, index: number) => {
+                  const testCaseIndex = index;
+                  if (testCaseIndex !== -1 && testCaseIndex < task.testCases.length) {
+                    // 每完成一个评估就更新状态
+                    set(state => {
+                      const t = state.tasks.find(task => task.id === taskId) as OptimizationTask;
+                      const updatedTestCases = [...t.testCases];
+                      
+                      // 计算这次评估的token用量
+                      const evaluationTokenUsage = {
+                        promptTokens: result.tokenUsage.promptTokens,
+                        completionTokens: result.tokenUsage.completionTokens,
+                        totalTokens: result.tokenUsage.totalTokens
+                      };
+                      
+                      // 更新总token用量
+                      const updatedTokenUsage = {
+                        promptTokens: t.optimizationModelTokenUsage.promptTokens + evaluationTokenUsage.promptTokens,
+                        completionTokens: t.optimizationModelTokenUsage.completionTokens + evaluationTokenUsage.completionTokens,
+                        totalTokens: t.optimizationModelTokenUsage.totalTokens + evaluationTokenUsage.totalTokens
+                      };
+                      
+                      // 更新评估结果
+                      if (updatedTestCases[testCaseIndex]) {
+                        const lastResult = updatedTestCases[testCaseIndex].iterationResults[currentIteration];
+                        if (lastResult) {
+                          lastResult.score = result.score;
+                          lastResult.comment = result.comment || '';
+                        }
                       }
-                    }
-                  });
 
-                  console.log(updatedTestCases)
+                      // 更新测试结果数组
+                      testResults[testCaseIndex] = {
+                        ...testResults[testCaseIndex],
+                        score: result.score,
+                        comment: result.comment,
+                      };
 
-                  return {
-                    tasks: state.tasks.map(t =>
-                        t.id === taskId
+                      return {
+                        tasks: state.tasks.map(t =>
+                          t.id === taskId
                             ? {
                               ...t,
                               optimizationModelTokenUsage: updatedTokenUsage,
                               testCases: updatedTestCases,
-                              promptIterations: t.promptIterations.map(pi =>
-                                  pi.iteration === currentIteration
-                                      ? { ...pi, stage: 'evaluated' as const }
-                                      : pi
-                              )
                             }
                             : t
+                        )
+                      };
+                    });
+
+                    // 更新UI提示
+                    const completedCount = task.testCases.filter(tc => 
+                      tc.iterationResults[currentIteration]?.score !== null
+                    ).length;
+                    toaster.update(toasterId as string, {
+                      description: `正在评估测试用例结果 (${completedCount}/${task.testCases.length})`,
+                    });
+                  }
+                };
+                
+                // 过滤掉已经评估过的测试结果
+                const pendingEvaluations = testResults.filter((result, index) => {
+                  const testCase = task.testCases[index];
+                  const iterationResult = testCase.iterationResults.find(r => r.iteration === currentIteration);
+                  return iterationResult && iterationResult.score === null;
+                });
+
+                // 创建索引映射
+                const evaluationIndexMapping: number[] = [];
+                testResults.forEach((result, originalIndex) => {
+                  const testCase = task.testCases[originalIndex];
+                  const iterationResult = testCase.iterationResults.find(r => r.iteration === currentIteration);
+                  if (iterationResult && iterationResult.score === null) {
+                    evaluationIndexMapping.push(originalIndex);
+                  }
+                });
+
+                // 修改回调函数
+                const mappedHandleSingleEvaluationComplete = (result: EvaluationResult, filteredIndex: number) => {
+                  const originalIndex = evaluationIndexMapping[filteredIndex];
+                  handleSingleEvaluationComplete(result, originalIndex);
+                };
+
+                if (pendingEvaluations.length > 0) {
+                  await evaluateResults({
+                    prompt: currentPrompt,
+                    testResults: pendingEvaluations,
+                    testMode: task.testSet.mode,
+                    model: optimizationModelInstance,
+                    isCancelled: () => get().tasks.find(t => t.id === taskId)?.status === 'paused',
+                    concurrentLimit: task.concurrentCalls,
+                    onSingleEvaluationComplete: mappedHandleSingleEvaluationComplete,
+                  });
+                } else {
+                  console.log("[runIteration] 所有评估已完成，跳过评估阶段");
+                }
+
+                // 确保所有评估都已完成
+                set(state => {
+                  return {
+                    tasks: state.tasks.map(t =>
+                      t.id === taskId
+                        ? {
+                          ...t,
+                          promptIterations: t.promptIterations.map(pi =>
+                            pi.iteration === currentIteration
+                              ? { ...pi, stage: 'evaluated' as const }
+                              : pi
+                          )
+                        }
+                        : t
                     )
                   };
                 });
@@ -726,7 +826,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                       reportSummary: summary.summaryReport,
                       stage: 'summarized' as const,
                       waitingForFeedback: t.requireUserFeedback && !allPerfect,
-                      showReport: iteration.showReport // 保留showReport属性
+                      showReport: iteration.showReport
                     };
                   }
                   return iteration;
@@ -996,6 +1096,16 @@ export const useOptimizationStore = create<OptimizationState>()(
           )
         }));
         console.log(`已更新任务 ${taskId} 的用户反馈设置: ${requireUserFeedback}`);
+      },
+      updateTaskConcurrentCalls: async (taskId, concurrentCalls) => {
+        set(state => ({
+          tasks: state.tasks.map(task => 
+            task.id === taskId 
+              ? { ...task, concurrentCalls }
+              : task
+          )
+        }));
+        console.log(`已更新任务 ${taskId} 的并发调用设置: ${concurrentCalls}`);
       },
 
       submitUserFeedback: async (taskId: string, iterationId: string, feedback: string) => {

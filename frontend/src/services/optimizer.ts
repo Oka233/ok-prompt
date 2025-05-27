@@ -61,22 +61,27 @@ export async function executeTests({
   testCases,
   model,
   isCancelled,
+  concurrentLimit = 3,
+  onSingleTestComplete,
 }: {
   prompt: string;
   testCases: TestCase[];
   model: ModelProvider;
-  isCancelled?: () => boolean; // 新增参数，用于检查任务是否被取消
+  isCancelled?: () => boolean; // 用于检查任务是否被取消
+  concurrentLimit?: number; // 并发限制
+  onSingleTestComplete?: (result: TestResult, index: number) => void; // 单个测试完成的回调
 }): Promise<TestResult[]> {
-  const results: TestResult[] = [];
-
-  for (let i = 0; i < testCases.length; i++) {
-    // 在每次LLM调用前检查是否需要取消
+  const results: TestResult[] = new Array(testCases.length);
+  
+  // 并发执行测试用例
+  const executeTestCase = async (index: number): Promise<void> => {
+    // 检查是否需要取消
     if (isCancelled && isCancelled()) {
-      console.log(`[executeTests] 任务已被取消，已处理 ${i}/${testCases.length} 个测试用例`);
-      throw new OperationCancelledError(`[executeTests] 任务已被取消，已处理 ${i}/${testCases.length} 个测试用例`);
+      console.log(`[executeTests] 任务已被取消，跳过测试用例 #${index}`);
+      throw new OperationCancelledError(`[executeTests] 任务已被取消，跳过测试用例 #${index}`);
     }
     
-    const testCase = testCases[i];
+    const testCase = testCases[index];
     
     const messages: ModelMessage[] = [
       { role: 'system', content: prompt },
@@ -90,8 +95,8 @@ export async function executeTests({
       const actualOutput = response.answer;
       
       // 记录结果
-      results.push({
-        index: i,
+      const result: TestResult = {
+        index,
         input: testCase.input,
         expectedOutput: testCase.output,
         actualOutput,
@@ -102,14 +107,21 @@ export async function executeTests({
           completionTokens: response.usage.completionTokens,
           totalTokens: response.usage.totalTokens,
         }
-      });
+      };
+      
+      results[index] = result;
+      
+      // 如果提供了回调函数，则调用它
+      if (onSingleTestComplete) {
+        onSingleTestComplete(result, index);
+      }
       
     } catch (error) {
-      console.error(`执行测试用例 #${i} 时出错:`, error);
+      console.error(`执行测试用例 #${index} 时出错:`, error);
       
       // 添加失败的测试结果
-      results.push({
-        index: i,
+      const result: TestResult = {
+        index,
         input: testCase.input,
         expectedOutput: testCase.output,
         actualOutput: `错误: ${(error as Error).message}`,
@@ -120,8 +132,33 @@ export async function executeTests({
           completionTokens: 0,
           totalTokens: 0
         }
-      });
+      };
+      
+      results[index] = result;
+      
+      // 如果提供了回调函数，则调用它
+      if (onSingleTestComplete) {
+        onSingleTestComplete(result, index);
+      }
     }
+  };
+
+  // 找出需要执行的测试用例索引（过滤掉已经有结果的）
+  const pendingIndices = Array.from({ length: testCases.length }, (_, i) => i)
+    .filter(i => !results[i]); // 过滤掉已有结果的索引
+  
+  // 使用Promise.all和分批处理来实现并发限制
+  for (let i = 0; i < pendingIndices.length; i += concurrentLimit) {
+    const batch = pendingIndices.slice(i, i + concurrentLimit);
+    
+    // 检查是否需要取消整个任务
+    if (isCancelled && isCancelled()) {
+      console.log(`[executeTests] 任务已被取消，已处理 ${i}/${pendingIndices.length} 个测试用例`);
+      throw new OperationCancelledError(`[executeTests] 任务已被取消，已处理 ${i}/${pendingIndices.length} 个测试用例`);
+    }
+    
+    // 并发执行当前批次
+    await Promise.all(batch.map(executeTestCase));
   }
 
   return results;
@@ -136,27 +173,32 @@ export async function evaluateResults({
   testMode,
   model,
   isCancelled,
+  concurrentLimit = 3,
+  onSingleEvaluationComplete,
 }: {
   prompt: string;
   testResults: InputTestResult[];
   testMode: TestMode;
   model: ModelProvider;
-  isCancelled?: () => boolean; // 新增参数，用于检查任务是否被取消
+  isCancelled?: () => boolean; // 用于检查任务是否被取消
+  concurrentLimit?: number; // 并发限制
+  onSingleEvaluationComplete?: (result: EvaluationResult, index: number) => void; // 单个评估完成的回调
 }): Promise<EvaluationResult[]> {
-  const evaluatedResults = [];
+  const evaluatedResults: EvaluationResult[] = new Array(testResults.length);
   
-  for (let i = 0; i < testResults.length; i++) {
-    // 在每次LLM调用前检查是否需要取消
+  // 评估单个测试结果
+  const evaluateTestResult = async (index: number): Promise<void> => {
+    // 检查是否需要取消
     if (isCancelled && isCancelled()) {
-      console.log(`[evaluateResults] 任务已被取消，已评估 ${i}/${testResults.length} 个结果`);
-      throw new OperationCancelledError(`[evaluateResults] 任务已被取消，已评估 ${i}/${testResults.length} 个结果`);
+      console.log(`[evaluateResults] 任务已被取消，跳过评估结果 #${index}`);
+      throw new OperationCancelledError(`[evaluateResults] 任务已被取消，跳过评估结果 #${index}`);
     }
     
-    const result = testResults[i];
+    const result = testResults[index];
     
     // 如果是严格模式且输出完全匹配，则自动评分为5分
     if (testMode === 'strict' && result.actualOutput === result.expectedOutput) {
-      evaluatedResults.push({
+      const evaluationResult: EvaluationResult = {
         score: 5,
         comment: '输出完全匹配',
         tokenUsage: {
@@ -164,8 +206,16 @@ export async function evaluateResults({
           completionTokens: 0,
           totalTokens: 0
         }
-      });
-      continue;
+      };
+      
+      evaluatedResults[index] = evaluationResult;
+      
+      // 如果提供了回调函数，则调用它
+      if (onSingleEvaluationComplete) {
+        onSingleEvaluationComplete(evaluationResult, index);
+      }
+      
+      return;
     }
     
     try {
@@ -185,7 +235,7 @@ export async function evaluateResults({
       // 解析评分和评估理由
       const { score, reasoning } = parseEvaluationResponse(evalResponse);
 
-      evaluatedResults.push({
+      const evaluationResult: EvaluationResult = {
         score,
         comment: reasoning,
         tokenUsage: {
@@ -193,13 +243,20 @@ export async function evaluateResults({
           completionTokens: response.usage.completionTokens,
           totalTokens: response.usage.totalTokens,
         }
-      });
+      };
+      
+      evaluatedResults[index] = evaluationResult;
+      
+      // 如果提供了回调函数，则调用它
+      if (onSingleEvaluationComplete) {
+        onSingleEvaluationComplete(evaluationResult, index);
+      }
       
     } catch (error) {
-      console.error(`评估测试结果 #${i} 时出错:`, error);
+      console.error(`评估测试结果 #${index} 时出错:`, error);
       
       // 评估失败时设置默认分数
-      evaluatedResults.push({
+      const evaluationResult: EvaluationResult = {
         score: 2,
         comment: `评估失败: ${(error as Error).message}`,
         tokenUsage: {
@@ -207,8 +264,33 @@ export async function evaluateResults({
           completionTokens: 0,
           totalTokens: 0,
         }
-      });
+      };
+      
+      evaluatedResults[index] = evaluationResult;
+      
+      // 如果提供了回调函数，则调用它
+      if (onSingleEvaluationComplete) {
+        onSingleEvaluationComplete(evaluationResult, index);
+      }
     }
+  };
+  
+  // 找出需要评估的测试结果索引（过滤掉已经有评估结果的）
+  const pendingIndices = Array.from({ length: testResults.length }, (_, i) => i)
+    .filter(i => !evaluatedResults[i] && testResults[i].score === null); // 过滤掉已有结果的索引和不需要评估的结果
+  
+  // 使用Promise.all和分批处理来实现并发限制
+  for (let i = 0; i < pendingIndices.length; i += concurrentLimit) {
+    const batch = pendingIndices.slice(i, i + concurrentLimit);
+    
+    // 检查是否需要取消整个任务
+    if (isCancelled && isCancelled()) {
+      console.log(`[evaluateResults] 任务已被取消，已评估 ${i}/${pendingIndices.length} 个结果`);
+      throw new OperationCancelledError(`[evaluateResults] 任务已被取消，已评估 ${i}/${pendingIndices.length} 个结果`);
+    }
+    
+    // 并发评估当前批次
+    await Promise.all(batch.map(evaluateTestResult));
   }
   
   return evaluatedResults;

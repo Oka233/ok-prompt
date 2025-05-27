@@ -72,6 +72,7 @@ export interface OptimizationTask {
   targetModelId?: string; // 目标模型ID
   optimizationModelId?: string; // 优化模型ID
   requireUserFeedback: boolean; // 是否需要用户反馈
+  concurrentCalls: number; // 并发调用数量
   testCases: TestCaseResult[]; // 使用统一后的 TestCaseResult
   promptIterations: PromptIteration[]; // 使用统一后的 PromptIteration
 }
