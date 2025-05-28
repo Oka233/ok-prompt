@@ -28,23 +28,16 @@ export function Sidebar() {
 
   // 处理任务选择
   const handleTaskSelect = (taskId: string) => {
-    console.log(`点击侧边栏任务: ${taskId}`);
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      console.log(`任务名称: ${task.name}, 数据集: ${task.datasetName}, 状态: ${task.status}`);
-    }
     selectTask(taskId);
   };
 
   // 处理新建优化任务
   const handleNewOptimization = () => {
-    console.log('点击发起新优化按钮');
     setViewState('upload');
   };
   
   // 处理进入模型管理
   const handleModelManagement = () => {
-    console.log('点击模型管理按钮');
     setViewState('model_management');
   };
 

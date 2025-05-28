@@ -34,12 +34,10 @@ export function PromptIterationList() {
         showSummary(currentTask.id, id);
       }
     }
-    console.log(`切换显示迭代 ${id} 的评估报告`);
   }
 
   const handleSelectIteration = (id: string) => {
     setSelectedIteration(id)
-    console.log(`选择迭代: ${id}`);
   }
 
   const handleFeedbackChange = (iterationId: string, value: string) => {

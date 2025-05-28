@@ -77,7 +77,6 @@ export async function executeTests({
   const executeTestCase = async (index: number): Promise<void> => {
     // 检查是否需要取消
     if (isCancelled && isCancelled()) {
-      console.log(`[executeTests] 任务已被取消，跳过测试用例 #${index}`);
       throw new OperationCancelledError(`[executeTests] 任务已被取消，跳过测试用例 #${index}`);
     }
     
@@ -89,7 +88,6 @@ export async function executeTests({
     ];
     
     // 直接调用目标LLM，让错误向上传播
-    console.log(`[executeTests] 开始执行测试用例 #${index}`);
     const response = await model.generateCompletion(messages);
     
     const actualOutput = response.answer;
@@ -127,7 +125,6 @@ export async function executeTests({
     
     // 检查是否需要取消整个任务
     if (isCancelled && isCancelled()) {
-      console.log(`[executeTests] 任务已被取消，已处理 ${i}/${pendingIndices.length} 个测试用例`);
       throw new OperationCancelledError(`[executeTests] 任务已被取消，已处理 ${i}/${pendingIndices.length} 个测试用例`);
     }
     
@@ -164,7 +161,6 @@ export async function evaluateResults({
   const evaluateTestResult = async (index: number): Promise<void> => {
     // 检查是否需要取消
     if (isCancelled && isCancelled()) {
-      console.log(`[evaluateResults] 任务已被取消，跳过评估结果 #${index}`);
       throw new OperationCancelledError(`[evaluateResults] 任务已被取消，跳过评估结果 #${index}`);
     }
     
@@ -201,7 +197,6 @@ export async function evaluateResults({
     );
     
     // 直接调用评估LLM，让错误向上传播
-    console.log(`[evaluateResults] 开始评估测试结果 #${index}`);
     const response = await model.generateCompletion(messages);
     
     const evalResponse = response.answer;
@@ -237,7 +232,6 @@ export async function evaluateResults({
     
     // 检查是否需要取消整个任务
     if (isCancelled && isCancelled()) {
-      console.log(`[evaluateResults] 任务已被取消，已评估 ${i}/${pendingIndices.length} 个结果`);
       throw new OperationCancelledError(`[evaluateResults] 任务已被取消，已评估 ${i}/${pendingIndices.length} 个结果`);
     }
     
@@ -311,7 +305,6 @@ export async function summarizeEvaluation({
   
   // 在LLM调用前检查是否需要取消
   if (isCancelled && isCancelled()) {
-    console.log(`[summarizeEvaluation] 任务已被取消，跳过评估总结`);
     throw new OperationCancelledError(`[summarizeEvaluation] 任务已被取消，跳过评估总结`);
   }
   
@@ -340,7 +333,6 @@ export async function summarizeEvaluation({
   };
   
   // 使用流式API
-  console.log('开始流式生成评估总结...');
   await model.generateCompletionStream(
     messages,
     {
@@ -433,7 +425,6 @@ export async function optimizePrompt({
 }> {
   // 在LLM调用前检查是否需要取消
   if (isCancelled && isCancelled()) {
-    console.log(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
     throw new OperationCancelledError(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
   }
   
@@ -456,7 +447,6 @@ export async function optimizePrompt({
   };
   
   // 使用流式API
-  console.log('开始流式生成优化后的提示词...');
   await model.generateCompletionStream(
     messages,
     {

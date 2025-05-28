@@ -70,8 +70,6 @@ export class GoogleAdapter implements ModelProvider {
           ...options,
         },
       });
-
-      console.log(response)
       
       // 获取响应内容
       const thoughts = response.candidates?.[0]?.content?.parts?.filter(p => {
