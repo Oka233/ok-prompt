@@ -75,6 +75,8 @@ export interface OptimizationTask {
   concurrentCalls: number; // 并发调用数量
   testCases: TestCaseResult[]; // 使用统一后的 TestCaseResult
   promptIterations: PromptIteration[]; // 使用统一后的 PromptIteration
+  isTargetModelReasoning: boolean;
+  isOptimizationModelReasoning: boolean;
 }
 
 // 定义优化迭代结果类型

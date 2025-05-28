@@ -70,7 +70,7 @@ interface OptimizationState {
   models: ModelConfig[];
   
   // 任务管理
-  createTask: (name: string, testSet: TestSet, initialPrompt: string, maxIterations?: number, tokenBudget?: number, targetModelId?: string, optimizationModelId?: string, requireUserFeedback?: boolean, concurrentCalls?: number) => Promise<void>;
+  createTask: (name: string, testSet: TestSet, initialPrompt: string, maxIterations?: number, tokenBudget?: number, targetModelId?: string, optimizationModelId?: string, requireUserFeedback?: boolean, concurrentCalls?: number, isTargetModelReasoning?: boolean, isOptimizationModelReasoning?: boolean) => Promise<void>;
   loadTasks: () => Promise<void>;
   selectTask: (taskId: string) => void;
   deleteTask: (taskId: string) => Promise<void>;
@@ -115,7 +115,7 @@ export const useOptimizationStore = create<OptimizationState>()(
       },
       
       // 任务管理
-      createTask: async (name, testSet, initialPrompt, maxIterations = 20, tokenBudget, targetModelId, optimizationModelId, requireUserFeedback = false, concurrentCalls = 3) => {
+      createTask: async (name, testSet, initialPrompt, maxIterations = 20, tokenBudget, targetModelId, optimizationModelId, requireUserFeedback = false, concurrentCalls = 3, isTargetModelReasoning = false, isOptimizationModelReasoning = false) => {
         set({ error: null });
         try {
           const initialTestCases: TestCaseResult[] = testSet.data.map((tc, index) => ({
@@ -159,7 +159,9 @@ export const useOptimizationStore = create<OptimizationState>()(
             requireUserFeedback,
             concurrentCalls,
             testCases: initialTestCases,
-            promptIterations: [initialPromptIteration]
+            promptIterations: [initialPromptIteration],
+            isTargetModelReasoning,
+            isOptimizationModelReasoning
           };
           
           set(state => ({ 
@@ -241,8 +243,8 @@ export const useOptimizationStore = create<OptimizationState>()(
           }
 
           // 创建模型实例
-          const targetModelInstance = ModelFactory.createModel(targetModel);
-          const optimizationModelInstance = ModelFactory.createModel(optimizationModel);
+          const targetModelInstance = ModelFactory.createModel(targetModel, task.isTargetModelReasoning);
+          const optimizationModelInstance = ModelFactory.createModel(optimizationModel, task.isOptimizationModelReasoning);
 
           // 更新任务状态为进行中
           set(state => updateTask(state, taskId, () => ({ status: 'in_progress' as const })));

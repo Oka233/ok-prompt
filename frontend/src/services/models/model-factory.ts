@@ -6,7 +6,7 @@ import { ModelConfig, ModelType } from '@/types/optimization';
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
 export class ModelFactory {
-  static createModel(config: ModelConfig): ModelProvider {
+  static createModel(config: ModelConfig, isReasoning: boolean = false): ModelProvider {
     // 根据模型类型创建不同的适配器
     switch (config.modelType) {
       case ModelType.OPENAI:

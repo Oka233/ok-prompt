@@ -34,8 +34,8 @@ interface TestModeOption {
 
 const testModeOptions = createListCollection({
   items: [
-    { label: '严格模式 (测试用例输出即模型的预期输出)', value: 'strict' },
-    { label: '描述性模式 (测试用例输出是对模型预期输出的描述)', value: 'descriptive' }
+    { label: '严格模式', value: 'strict' },
+    { label: '描述性模式', value: 'descriptive' }
   ] as TestModeOption[]
 })
 
@@ -57,6 +57,8 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
   const [targetModelId, setTargetModelId] = useState<string | undefined>(undefined);
   const [optimizationModelId, setOptimizationModelId] = useState<string | undefined>(undefined);
   const [requireUserFeedback, setRequireUserFeedback] = useState(false);
+  const [isTargetModelReasoning, setIsTargetModelReasoning] = useState(false);
+  const [isOptimizationModelReasoning, setIsOptimizationModelReasoning] = useState(false);
 
   const modelOptions = useMemo(() => createModelListCollection(models), [models]);
   
@@ -101,7 +103,10 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
         undefined,
         targetModelId,
         optimizationModelId,
-        requireUserFeedback
+        requireUserFeedback,
+        3,
+        isTargetModelReasoning,
+        isOptimizationModelReasoning,
       );
       
       onUpload();
@@ -261,6 +266,16 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                   </Select.Positioner>
                 </Portal>
               </Select.Root>
+              <Box>
+                <Text fontSize="sm" color="gray.500" mt={2}>
+                  严格模式下，要求模型输出与用例输出严格匹配；描述性模式下，用例输出是对模型输出的描述，由模型打分符合程度
+                </Text>
+              </Box>
+              <Box mt={1}>
+                <Text fontSize="sm" color="gray.500">
+                  
+                </Text>
+              </Box>
             </Box>
 
             <Box>
@@ -304,6 +319,22 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
             </Box>
 
             <Box>
+              <Checkbox.Root
+                defaultChecked={false}
+                onCheckedChange={(details) => {
+                  setIsTargetModelReasoning(!!details.checked);
+                }}
+              >
+                <Checkbox.HiddenInput />
+                <Checkbox.Control />
+                <Checkbox.Label>推理模型</Checkbox.Label>
+              </Checkbox.Root>
+              <Text fontSize="sm" color="gray.500" mt={1}>
+                如果目标模型是推理模型，或为支持推理的模型启用推理，请勾选
+              </Text>
+            </Box>
+
+            <Box>
               <Text mb={2} fontWeight="medium">优化模型</Text>
               <Select.Root 
                 collection={modelOptions} 
@@ -341,6 +372,22 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                   </Select.Positioner>
                 </Portal>
               </Select.Root>
+            </Box>
+
+            <Box>
+              <Checkbox.Root
+                defaultChecked={false}
+                onCheckedChange={(details) => {
+                  setIsOptimizationModelReasoning(!!details.checked);
+                }}
+              >
+                <Checkbox.HiddenInput />
+                <Checkbox.Control />
+                <Checkbox.Label>推理模型</Checkbox.Label>
+              </Checkbox.Root>
+              <Text fontSize="sm" color="gray.500" mt={1}>
+                如果优化模型是推理模型，或为支持推理的模型启用推理，请勾选
+              </Text>
             </Box>
 
             <Box>
