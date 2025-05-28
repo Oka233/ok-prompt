@@ -941,6 +941,9 @@ export const useOptimizationStore = create<OptimizationState>()(
                     : t
                 )
               }));
+              
+              // 将错误向上抛出，让上层也能处理
+              throw error;
             }
           };
 
@@ -950,7 +953,16 @@ export const useOptimizationStore = create<OptimizationState>()(
           // 处理取消错误
           if (error instanceof OperationCancelledError) {
             console.log(`任务 ${taskId} 被用户取消: ${error.message}`);
-            // 确保任务状态被设置为暂停
+          } else {
+            console.error('开始优化失败:', error);
+            
+            // 显示详细的错误信息
+            toaster.create({
+              title: "优化失败",
+              description: `发生错误: ${(error as Error).message}`,
+              type: "error",
+            });
+            
             set(state => ({
               tasks: state.tasks.map(t => 
                 t.id === taskId 
@@ -958,16 +970,6 @@ export const useOptimizationStore = create<OptimizationState>()(
                   : t
               )
             }));
-          } else {
-            console.error('开始优化失败:', error);
-            set({ 
-              error: (error as Error).message,
-              tasks: get().tasks.map(t => 
-                t.id === taskId 
-                  ? { ...t, status: 'not_started' as const }
-                  : t
-              )
-            });
           }
         } finally {
           if (toasterId) {
@@ -991,7 +993,6 @@ export const useOptimizationStore = create<OptimizationState>()(
           toaster.create({
             description: "当前已发送的请求返回后，任务将停止",
             type: "default",
-            duration: 3000,
           });
         } catch (error) {
           set({ error: (error as Error).message });

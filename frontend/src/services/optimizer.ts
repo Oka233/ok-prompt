@@ -88,58 +88,32 @@ export async function executeTests({
       { role: 'user', content: testCase.input }
     ];
     
-    try {
-      // 调用目标LLM
-      const response = await model.generateCompletion(messages);
-      
-      const actualOutput = response.answer;
-      
-      // 记录结果
-      const result: TestResult = {
-        index,
-        input: testCase.input,
-        expectedOutput: testCase.output,
-        actualOutput,
-        score: 0, // 初始分数，将在评估阶段更新
-        comment: '',
-        tokenUsage: {
-          promptTokens: response.usage.promptTokens,
-          completionTokens: response.usage.completionTokens,
-          totalTokens: response.usage.totalTokens,
-        }
-      };
-      
-      results[index] = result;
-      
-      // 如果提供了回调函数，则调用它
-      if (onSingleTestComplete) {
-        onSingleTestComplete(result, index);
+    // 直接调用目标LLM，让错误向上传播
+    console.log(`[executeTests] 开始执行测试用例 #${index}`);
+    const response = await model.generateCompletion(messages);
+    
+    const actualOutput = response.answer;
+    
+    // 记录结果
+    const result: TestResult = {
+      index,
+      input: testCase.input,
+      expectedOutput: testCase.output,
+      actualOutput,
+      score: 0, // 初始分数，将在评估阶段更新
+      comment: '',
+      tokenUsage: {
+        promptTokens: response.usage.promptTokens,
+        completionTokens: response.usage.completionTokens,
+        totalTokens: response.usage.totalTokens,
       }
-      
-    } catch (error) {
-      console.error(`执行测试用例 #${index} 时出错:`, error);
-      
-      // 添加失败的测试结果
-      const result: TestResult = {
-        index,
-        input: testCase.input,
-        expectedOutput: testCase.output,
-        actualOutput: `错误: ${(error as Error).message}`,
-        score: 1, // 失败的测试用例评分为1
-        comment: `执行失败: ${(error as Error).message}`,
-        tokenUsage: {
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0
-        }
-      };
-      
-      results[index] = result;
-      
-      // 如果提供了回调函数，则调用它
-      if (onSingleTestComplete) {
-        onSingleTestComplete(result, index);
-      }
+    };
+    
+    results[index] = result;
+    
+    // 如果提供了回调函数，则调用它
+    if (onSingleTestComplete) {
+      onSingleTestComplete(result, index);
     }
   };
 
@@ -218,60 +192,38 @@ export async function evaluateResults({
       return;
     }
     
-    try {
-      // 构建评估提示词
-      const messages = generateEvaluationPrompt(
-        prompt,
-        { input: result.input, output: result.expectedOutput },
-        result.actualOutput,
-        testMode
-      );
-      
-      // 调用评估LLM
-      const response = await model.generateCompletion(messages);
-      
-      const evalResponse = response.answer;
-      
-      // 解析评分和评估理由
-      const { score, reasoning } = parseEvaluationResponse(evalResponse);
+    // 构建评估提示词
+    const messages = generateEvaluationPrompt(
+      prompt,
+      { input: result.input, output: result.expectedOutput },
+      result.actualOutput,
+      testMode
+    );
+    
+    // 直接调用评估LLM，让错误向上传播
+    console.log(`[evaluateResults] 开始评估测试结果 #${index}`);
+    const response = await model.generateCompletion(messages);
+    
+    const evalResponse = response.answer;
+    
+    // 解析评分和评估理由
+    const { score, reasoning } = parseEvaluationResponse(evalResponse);
 
-      const evaluationResult: EvaluationResult = {
-        score,
-        comment: reasoning,
-        tokenUsage: {
-          promptTokens: response.usage.promptTokens,
-          completionTokens: response.usage.completionTokens,
-          totalTokens: response.usage.totalTokens,
-        }
-      };
-      
-      evaluatedResults[index] = evaluationResult;
-      
-      // 如果提供了回调函数，则调用它
-      if (onSingleEvaluationComplete) {
-        onSingleEvaluationComplete(evaluationResult, index);
+    const evaluationResult: EvaluationResult = {
+      score,
+      comment: reasoning,
+      tokenUsage: {
+        promptTokens: response.usage.promptTokens,
+        completionTokens: response.usage.completionTokens,
+        totalTokens: response.usage.totalTokens,
       }
-      
-    } catch (error) {
-      console.error(`评估测试结果 #${index} 时出错:`, error);
-      
-      // 评估失败时设置默认分数
-      const evaluationResult: EvaluationResult = {
-        score: 2,
-        comment: `评估失败: ${(error as Error).message}`,
-        tokenUsage: {
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0,
-        }
-      };
-      
-      evaluatedResults[index] = evaluationResult;
-      
-      // 如果提供了回调函数，则调用它
-      if (onSingleEvaluationComplete) {
-        onSingleEvaluationComplete(evaluationResult, index);
-      }
+    };
+    
+    evaluatedResults[index] = evaluationResult;
+    
+    // 如果提供了回调函数，则调用它
+    if (onSingleEvaluationComplete) {
+      onSingleEvaluationComplete(evaluationResult, index);
     }
   };
   
@@ -348,8 +300,8 @@ export async function summarizeEvaluation({
   testResults: InputTestResult[];
   testMode: TestMode;
   model: ModelProvider;
-  onProgress?: (partialSummary: string) => void;
-  isCancelled?: () => boolean; // 新增参数，用于检查任务是否被取消
+  onProgress: (partialSummary: string) => void; // 现在是必需参数
+  isCancelled?: () => boolean;
 }): Promise<EvaluationSummary> {
   // 计算统计数据
   const totalCases = testResults.length;
@@ -357,105 +309,67 @@ export async function summarizeEvaluation({
   const avgScore = scores.reduce((sum, score) => sum + score, 0) / totalCases;
   const perfectScores = scores.filter(score => score === 5).length;
   
-  try {
-    // 在LLM调用前检查是否需要取消
-    if (isCancelled && isCancelled()) {
-      console.log(`[summarizeEvaluation] 任务已被取消，跳过评估总结`);
-      throw new OperationCancelledError(`[summarizeEvaluation] 任务已被取消，跳过评估总结`);
-    }
-    
-    // 构建总结提示词
-    const messages = generateSummaryPrompt(
-      prompt,
-      testMode,
-      totalCases,
-      perfectScores,
-      avgScore,
-      testResults.map((res, index) => ({
-        index,
-        input: res.input,
-        expectedOutput: res.expectedOutput,
-        actualOutput: res.actualOutput,
-        score: res.score || 0, // 处理null值
-        reasoning: res.comment || '' // 处理null值
-      }))
-    );
-    
-    // 如果提供了进度回调，使用流式API
-    if (onProgress) {
-      let fullContent = '';
-      let tokenUsage = {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0
-      };
-      
-      // 使用流式API
-      await model.generateCompletionStream(
-        messages,
-        {
-          onContent: (thought, answer) => {
-            if (!answer) {
-              fullContent = `[思考中]  ${thought}`;
-            } else {
-              fullContent = answer;
-            }
-            // 从标签中提取内容
-            const extractedContent = extractSummaryContent(fullContent);
-            onProgress(extractedContent);
-          },
-          onUsage: (usage) => {
-            tokenUsage = usage;
-          },
-          onComplete: (thought, answer) => {
-            // 完成时的处理（可选）
-          }
-        }
-      );
-      
-      return {
-        avgScore,
-        perfectScoreCount: perfectScores,
-        totalCases,
-        summaryReport: extractSummaryContent(fullContent),
-        tokenUsage
-      };
-    } else {
-      // 使用非流式API
-      const response = await model.generateCompletion(messages);
-      const summaryContent = extractSummaryContent(response.answer);
-      
-      return {
-        avgScore,
-        perfectScoreCount: perfectScores,
-        totalCases,
-        summaryReport: summaryContent,
-        tokenUsage: {
-          promptTokens: response.usage.promptTokens,
-          completionTokens: response.usage.completionTokens,
-          totalTokens: response.usage.totalTokens,
-        }
-      };
-    }
-    
-  } catch (error) {
-    if (error instanceof OperationCancelledError) {
-      throw error; // 重新抛出取消错误
-    }
-    console.error('生成评估总结时出错:', error);
-    
-    return {
-      avgScore,
-      perfectScoreCount: perfectScores,
-      totalCases,
-      summaryReport: `生成总结失败: ${(error as Error).message}`,
-      tokenUsage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0
-      }
-    };
+  // 在LLM调用前检查是否需要取消
+  if (isCancelled && isCancelled()) {
+    console.log(`[summarizeEvaluation] 任务已被取消，跳过评估总结`);
+    throw new OperationCancelledError(`[summarizeEvaluation] 任务已被取消，跳过评估总结`);
   }
+  
+  // 构建总结提示词
+  const messages = generateSummaryPrompt(
+    prompt,
+    testMode,
+    totalCases,
+    perfectScores,
+    avgScore,
+    testResults.map((res, index) => ({
+      index,
+      input: res.input,
+      expectedOutput: res.expectedOutput,
+      actualOutput: res.actualOutput,
+      score: res.score || 0, // 处理null值
+      reasoning: res.comment || '' // 处理null值
+    }))
+  );
+  
+  let fullContent = '';
+  let tokenUsage = {
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0
+  };
+  
+  // 使用流式API
+  console.log('开始流式生成评估总结...');
+  await model.generateCompletionStream(
+    messages,
+    {
+      onContent: (thought, answer) => {
+        if (!answer) {
+          fullContent = `[思考中]  ${thought}`;
+        } else {
+          fullContent = answer;
+        }
+        // 从标签中提取内容
+        const extractedContent = extractSummaryContent(fullContent);
+        onProgress(extractedContent);
+      },
+      onUsage: (usage) => {
+        tokenUsage = usage;
+      },
+      onComplete: (thought, answer) => {
+        // 完成时的处理（可选）
+      }
+    }
+  );
+  
+  return {
+    avgScore,
+    perfectScoreCount: perfectScores,
+    totalCases,
+    summaryReport: extractSummaryContent(fullContent),
+    tokenUsage
+  };
 }
 
 /**
@@ -492,8 +406,8 @@ export async function optimizePrompt({
   testMode: TestMode;
   userFeedback?: string;
   model: ModelProvider;
-  onProgress?: (partialPrompt: string) => void;
-  isCancelled?: () => boolean; // 新增参数，用于检查任务是否被取消
+  onProgress: (partialPrompt: string) => void; // 现在是必需参数
+  isCancelled?: () => boolean;
   historicalIterations?: Array<{
     iteration: number,
     prompt: string,
@@ -517,90 +431,57 @@ export async function optimizePrompt({
     totalTokens: number;
   };
 }> {
-  try {
-    // 在LLM调用前检查是否需要取消
-    if (isCancelled && isCancelled()) {
-      console.log(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
-      throw new OperationCancelledError(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
-    }
-    
-    // 构建优化提示词
-    const messages = generateOptimizationPrompt(
-      currentPrompt,
-      evaluationSummary,
-      testMode,
-      userFeedback,
-      historicalIterations,
-      currentResults,
-      currentAvgScore
-    );
-    
-    // 如果提供了进度回调，使用流式API
-    if (onProgress) {
-      let fullContent = '';
-      let tokenUsage = {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0
-      };
-      
-      // 使用流式API
-      await model.generateCompletionStream(
-        messages,
-        {
-          onContent: (thought, answer) => {
-            if (!answer) {
-              fullContent = `[思考中]  \n${thought}`;
-            } else {
-              fullContent = answer;
-            }
-            const cleanedPartialPrompt = cleanOptimizedPrompt(fullContent);
-            onProgress(cleanedPartialPrompt);
-          },
-          onUsage: (usage) => {
-            tokenUsage = usage;
-          },
-          onComplete: (thought, answer) => {
-            // 完成时的处理（可选）
-          }
-        }
-      );
-      
-      return {
-        newPrompt: cleanOptimizedPrompt(fullContent),
-        tokenUsage
-      };
-    } else {
-      // 使用非流式API
-      const response = await model.generateCompletion(messages);
-      const newPrompt = cleanOptimizedPrompt(response.answer); // 使用answer部分
-      
-      return {
-        newPrompt,
-        tokenUsage: {
-          promptTokens: response.usage.promptTokens,
-          completionTokens: response.usage.completionTokens,
-          totalTokens: response.usage.totalTokens,
-        }
-      };
-    }
-    
-  } catch (error) {
-    if (error instanceof OperationCancelledError) {
-      throw error; // 重新抛出取消错误
-    }
-    console.error('优化提示词时出错:', error);
-    
-    // 出错时返回原始提示词
-    return {
-      newPrompt: currentPrompt,
-      tokenUsage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0
-      }
-    };
+  // 在LLM调用前检查是否需要取消
+  if (isCancelled && isCancelled()) {
+    console.log(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
+    throw new OperationCancelledError(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
   }
+  
+  // 构建优化提示词
+  const messages = generateOptimizationPrompt(
+    currentPrompt,
+    evaluationSummary,
+    testMode,
+    userFeedback,
+    historicalIterations,
+    currentResults,
+    currentAvgScore
+  );
+  
+  let fullContent = '';
+  let tokenUsage = {
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0
+  };
+  
+  // 使用流式API
+  console.log('开始流式生成优化后的提示词...');
+  await model.generateCompletionStream(
+    messages,
+    {
+      onContent: (thought, answer) => {
+        if (!answer) {
+          fullContent = `[思考中]  \n${thought}`;
+        } else {
+          fullContent = answer;
+        }
+        const cleanedPartialPrompt = cleanOptimizedPrompt(fullContent);
+        onProgress(cleanedPartialPrompt);
+      },
+      onUsage: (usage) => {
+        tokenUsage = usage;
+      },
+      onComplete: (thought, answer) => {
+        // 完成时的处理（可选）
+      }
+    }
+  );
+  
+  return {
+    newPrompt: cleanOptimizedPrompt(fullContent),
+    tokenUsage
+  };
 }
 
 /**
