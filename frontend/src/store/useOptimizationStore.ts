@@ -77,6 +77,7 @@ interface OptimizationState {
   updateTaskModels: (taskId: string, targetModelId?: string, optimizationModelId?: string) => Promise<void>;
   updateTaskFeedbackSetting: (taskId: string, requireUserFeedback: boolean) => Promise<void>;
   updateTaskConcurrentCalls: (taskId: string, concurrentCalls: number) => Promise<void>;
+  updateTaskReasoningSettings: (taskId: string, isTargetModelReasoning: boolean, isOptimizationModelReasoning: boolean) => Promise<void>;
   
   // 视图控制
   setViewState: (state: ViewState) => void;
@@ -323,7 +324,7 @@ export const useOptimizationStore = create<OptimizationState>()(
 
                 // 收集历史迭代信息
                 const historicalIterations = task.promptIterations
-                  .filter(iter => iter.iteration < currentIteration)
+                  .filter(iter => iter.iteration < currentIteration - 1)
                   .map(iter => ({
                     iteration: iter.iteration,
                     prompt: iter.prompt,
@@ -594,7 +595,7 @@ export const useOptimizationStore = create<OptimizationState>()(
                 };
 
                 // 评估完成后，更新迭代状态
-                await evaluateResults({
+                const { evaluatedResults, avgScore } = await evaluateResults({
                   prompt: currentPrompt,
                   testResults: pendingEvaluations,
                   testMode: task.testSet.mode,
@@ -603,16 +604,16 @@ export const useOptimizationStore = create<OptimizationState>()(
                   concurrentLimit: task.concurrentCalls,
                   onSingleEvaluationComplete: mappedHandleSingleEvaluationComplete,
                 });
-              }
-
-              // 确保所有评估都已完成
-              set(state => updateTask(state, taskId, () => ({
-                promptIterations: getTask(state, taskId)!.promptIterations.map(pi =>
-                  pi.iteration === currentIteration
-                    ? { ...pi, stage: 'evaluated' as const }
+                
+                // 确保所有评估都已完成，并立即更新平均分数
+                set(state => updateTask(state, taskId, () => ({
+                  promptIterations: getTask(state, taskId)!.promptIterations.map(pi =>
+                    pi.iteration === currentIteration
+                      ? { ...pi, stage: 'evaluated' as const, avgScore }
                     : pi
-                )
-              })));
+                  )
+                })));
+              }
 
               // 再次检查任务状态
               if (isTaskPaused(get(), taskId)) {
@@ -668,7 +669,6 @@ export const useOptimizationStore = create<OptimizationState>()(
                     iteration.iteration === currentIteration
                       ? {
                         ...iteration,
-                        avgScore: summary.avgScore,
                         reportSummary: summary.summaryReport,
                         stage: 'summarized' as const,
                         waitingForFeedback: t.requireUserFeedback && !allPerfect,
@@ -871,6 +871,15 @@ export const useOptimizationStore = create<OptimizationState>()(
           tasks: state.tasks.map(task => 
             task.id === taskId 
               ? { ...task, concurrentCalls }
+              : task
+          )
+        }));
+      },
+      updateTaskReasoningSettings: async (taskId, isTargetModelReasoning, isOptimizationModelReasoning) => {
+        set(state => ({
+          tasks: state.tasks.map(task => 
+            task.id === taskId 
+              ? { ...task, isTargetModelReasoning, isOptimizationModelReasoning }
               : task
           )
         }));

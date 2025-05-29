@@ -6,6 +6,7 @@ import {
 import { TestCase, TestMode } from '@/types/optimization';
 import { ModelProvider, ModelMessage } from '@/types/model';
 import { OperationCancelledError } from '@/errors/OperationCancelledError';
+import { filterContentByTag } from '@/utils/streamingUtils';
 
 export interface InputTestResult {
   input: string;
@@ -154,7 +155,7 @@ export async function evaluateResults({
   isCancelled?: () => boolean; // 用于检查任务是否被取消
   concurrentLimit?: number; // 并发限制
   onSingleEvaluationComplete?: (result: EvaluationResult, index: number) => void; // 单个评估完成的回调
-}): Promise<EvaluationResult[]> {
+}): Promise<{ evaluatedResults: EvaluationResult[], avgScore: number }> {
   const evaluatedResults: EvaluationResult[] = new Array(testResults.length);
   
   // 评估单个测试结果
@@ -239,7 +240,20 @@ export async function evaluateResults({
     await Promise.all(batch.map(evaluateTestResult));
   }
   
-  return evaluatedResults;
+  // 计算平均分数
+  let totalScore = 0;
+  let validScores = 0;
+  
+  evaluatedResults.forEach(result => {
+    if (result && typeof result.score === 'number') {
+      totalScore += result.score;
+      validScores++;
+    }
+  });
+  
+  const avgScore = validScores > 0 ? totalScore / validScores : 0;
+  
+  return { evaluatedResults, avgScore };
 }
 
 /**
@@ -338,13 +352,12 @@ export async function summarizeEvaluation({
     {
       onContent: (thought, answer) => {
         if (!answer) {
-          fullContent = `[思考中]  ${thought}`;
+          fullContent = `<思考中> ${thought}`;
         } else {
-          fullContent = answer;
+          const { content } = filterContentByTag(answer, 'Summary');
+          fullContent = content;
         }
-        // 从标签中提取内容
-        const extractedContent = extractSummaryContent(fullContent);
-        onProgress(extractedContent);
+        onProgress(fullContent);
       },
       onUsage: (usage) => {
         tokenUsage = usage;
@@ -359,23 +372,9 @@ export async function summarizeEvaluation({
     avgScore,
     perfectScoreCount: perfectScores,
     totalCases,
-    summaryReport: extractSummaryContent(fullContent),
+    summaryReport: fullContent,
     tokenUsage
   };
-}
-
-/**
- * 从回复中提取Summary标签内的内容
- */
-function extractSummaryContent(content: string): string {
-  // 从<Summary>标签中提取内容
-  const summaryMatch = content.match(/<Summary>([\s\S]*?)<\/Summary>/);
-  if (summaryMatch && summaryMatch[1]) {
-    return summaryMatch[1].trim();
-  }
-  // 如果没有找到标签，则记录警告并返回原始内容
-  console.warn('未找到<Summary>标签，返回原始内容');
-  return content;
 }
 
 /**
@@ -451,13 +450,25 @@ export async function optimizePrompt({
     messages,
     {
       onContent: (thought, answer) => {
-        if (!answer) {
-          fullContent = `[思考中]  \n${thought}`;
+        if (thought) {
+          // 推理模型，返回thought
+          if (!answer) {
+            fullContent = `<思考中> \n${thought}`;
+          } else {
+            fullContent = answer;
+          }
         } else {
-          fullContent = answer;
+          // 非推理模型，从thinking标签提取思考内容
+          const { closed: isThinkingClosed, content: thinkingContent } = filterContentByTag(answer, 'Thinking');
+          const { closed: isPromptClosed, content: promptContent } = filterContentByTag(answer, 'Prompt');
+          if (!isThinkingClosed && !isPromptClosed) {
+            fullContent = `<思考中> \n${thinkingContent}`;
+          } else {
+            fullContent = promptContent;
+          }
         }
-        const cleanedPartialPrompt = cleanOptimizedPrompt(fullContent);
-        onProgress(cleanedPartialPrompt);
+        
+        onProgress(fullContent);
       },
       onUsage: (usage) => {
         tokenUsage = usage;
@@ -469,22 +480,7 @@ export async function optimizePrompt({
   );
   
   return {
-    newPrompt: cleanOptimizedPrompt(fullContent),
+    newPrompt: fullContent,
     tokenUsage
   };
-}
-
-/**
- * 清理优化后的提示词（移除可能的标记和前缀）
- */
-function cleanOptimizedPrompt(prompt: string): string {
-  // 从<Prompt>标签中提取内容
-  const promptMatch = prompt.match(/<Prompt>([\s\S]*?)<\/Prompt>/);
-  if (promptMatch && promptMatch[1]) {
-    return promptMatch[1].trim();
-  }
-  
-  // 如果没有找到<Prompt>标签，返回完整内容并记录警告
-  console.warn('未找到<Prompt>标签，返回原始内容');
-  return prompt.trim();
 }

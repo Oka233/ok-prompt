@@ -93,13 +93,36 @@ export function PromptIterationList() {
     const stage = item.stage;
     const currentIteration = tasks.find(task => task.id === currentTaskId)?.promptIterations.find(iteration => iteration.id === item.id)
 
+    // 获取分数徽章的背景颜色
+    const getScoreBadgeColor = (score: number | null) => {
+      if (score === null) return "gray.500";
+      
+      switch(Math.floor(score)) {
+        case 5: return "green.500";
+        case 4: return "green.400";
+        case 3: return "orange.400";
+        case 2: return "red.400";
+        case 1: return "red.500";
+        default: return "gray.500";
+      }
+    }
+
     return (
-      <Flex alignItems="center">
-        <Badge colorPalette={stageColors[stage as keyof typeof stageColors]} ml={2}>
+      <Flex alignItems="center" gap={2}>
+        <Badge ml={2} colorPalette={stageColors[stage as keyof typeof stageColors]}>
           {stageText[stage as keyof typeof stageText]}
         </Badge>
+        {item.avgScore !== null && (stage === 'evaluated' || stage === 'summarized') && (
+          <Badge
+            fontSize="xs"
+            color="white"
+            bg={getScoreBadgeColor(item.avgScore)}
+          >
+            {item.avgScore.toFixed(1)}
+          </Badge>
+        )}
         {currentTask?.status === 'in_progress' && item.iteration === currentIteration && (
-          <Spinner size="sm" ml={2} color="blue.500" />
+          <Spinner size="sm" color="blue.500" />
         )}
       </Flex>
     )
