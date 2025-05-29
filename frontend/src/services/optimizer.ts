@@ -260,37 +260,27 @@ export async function evaluateResults({
  * 解析评估响应
  */
 function parseEvaluationResponse(response: string): { score: number; reasoning: string } {
-  try {
-    // 从<Score>标签中提取分数
-    const scoreMatch = response.match(/<Score>(.*?)<\/Score>/s);
-    // 从<Reason>标签中提取评估理由
-    const reasonMatch = response.match(/<Reason>(.*?)<\/Reason>/s);
-    
-    let score = 3; // 默认分数
-    let reasoning = '';
-    
-    if (scoreMatch && scoreMatch[1]) {
-      // 提取数字
-      const scoreText = scoreMatch[1].trim();
-      const match = scoreText.match(/[1-5]/);
-      if (match) {
-        score = parseInt(match[0], 10);
-      }
-    } else {
-      console.warn('未找到<Score>标签，使用默认分数');
-    }
-    
-    if (reasonMatch && reasonMatch[1]) {
-      reasoning = reasonMatch[1].trim();
-    } else {
-      reasoning = `未找到<Reason>标签，无法获取评估理由`;
-    }
-    
-    return { score, reasoning };
-  } catch (error) {
-    console.error('解析评估响应时出错:', error);
-    return { score: 3, reasoning: `解析评估失败: ${(error as Error).message}` };
+  // 从<Score>标签中提取分数
+  const scoreMatch = response.match(/<Score>(.*?)<\/Score>/s);
+  // 从<Reason>标签中提取评估理由
+  const reasonMatch = response.match(/<Reason>(.*?)<\/Reason>/s);
+  
+  if (!scoreMatch || !scoreMatch[1]) {
+    throw new Error('无法获取分数');
   }
+  if (!reasonMatch || !reasonMatch[1]) {
+    throw new Error('无法获取评估理由');
+  }
+
+  // 提取数字
+  const scoreText = scoreMatch[1].trim();
+  const match = scoreText.match(/[1-5]/);
+  if (!match) {
+    throw new Error('分数格式不正确，未能提取到1-5之间的分数');
+  }
+  const score = parseInt(match[0], 10);
+  const reasoning = reasonMatch[1].trim();
+  return { score, reasoning };
 }
 
 /**
@@ -452,10 +442,11 @@ export async function optimizePrompt({
       onContent: (thought, answer) => {
         if (thought) {
           // 推理模型，返回thought
+          const { closed: isPromptClosed, content: promptContent } = filterContentByTag(answer, 'Prompt');
           if (!answer) {
             fullContent = `<思考中> \n${thought}`;
           } else {
-            fullContent = answer;
+            fullContent = promptContent;
           }
         } else {
           // 非推理模型，从thinking标签提取思考内容
