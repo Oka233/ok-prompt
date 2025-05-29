@@ -10,15 +10,16 @@ import {
   Portal,
   createListCollection,
   IconButton,
-  HStack,
   VStack,
   useDisclosure,
   Spinner,
-  Checkbox
+  Checkbox,
+  Dialog,
+  CloseButton
 } from '@chakra-ui/react'
 import { FiTrash2, FiSettings, FiSave, FiXCircle, FiPlay, FiStopCircle } from 'react-icons/fi'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface OptimizationHeaderProps {
   taskId: string
@@ -65,6 +66,8 @@ export function OptimizationHeader({
     setIsTargetModelReasoning(currentTask?.isTargetModelReasoning || false);
     setIsOptimizationModelReasoning(currentTask?.isOptimizationModelReasoning || false);
   }, [currentTask?.targetModelId, currentTask?.optimizationModelId, currentTask?.requireUserFeedback, currentTask?.isTargetModelReasoning, currentTask?.isOptimizationModelReasoning, taskId]);
+
+  const contentRef = useRef<HTMLDivElement>(null)
 
   const modelOptionsCollection = createListCollection<ModelOption>({
     items: models.map(model => ({ label: model.displayName, value: model.id }))
@@ -219,188 +222,167 @@ export function OptimizationHeader({
         </Box>
       </Flex>
       
-      {/* 高级模型设置对话框 */}
-      {open && (
-        <Box
-          position="fixed"
-          top="0"
-          left="0"
-          right="0"
-          bottom="0"
-          bg="rgba(0,0,0,0.4)"
-          zIndex="1000"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Box
-            bg="white"
-            borderRadius="md"
-            maxW="500px"
-            w="90%"
-            p={6}
-            position="relative"
-          >
-            <Heading as="h4" size="md" mb={4}>设置</Heading>
-            <Box position="absolute" top="10px" right="10px" cursor="pointer" onClick={onClose}>
-              ✕
-            </Box>
-            
-            <VStack gap={4} align="stretch">
-              <Box>
-                <Text mb={1} fontSize="sm" fontWeight="medium">目标模型</Text>
-                <Select.Root
-                  collection={modelOptionsCollection}
-                  size="sm"
-                  onValueChange={(details) => setSelectedTargetModel(details.value?.[0])}
-                  value={selectedTargetModel ? [selectedTargetModel] : []}
-                >
-                  <Select.HiddenSelect />
-                  <Select.Control>
-                    <Select.Trigger>
-                      <Select.ValueText placeholder="选择目标模型" />
-                    </Select.Trigger>
-                    <Select.IndicatorGroup>
-                      <Select.Indicator />
-                    </Select.IndicatorGroup>
-                  </Select.Control>
-                  <Portal>
-                    <Select.Positioner>
-                      <Select.Content>
-                        {modelOptionsCollection.items.map((modelItem: ModelOption) => (
-                          <Select.Item item={modelItem} key={modelItem.value}>
-                            {modelItem.label}
-                            <Select.ItemIndicator />
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Positioner>
-                  </Portal>
-                </Select.Root>
-              </Box>
+      {/* 设置对话框 */}
+      <Dialog.Root open={open} onOpenChange={onClose}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="500px" ref={contentRef}>
+              <Dialog.Header>
+                <Dialog.Title>设置</Dialog.Title>
+              </Dialog.Header>
               
-              <Box>
-                <Checkbox.Root
-                  checked={isTargetModelReasoning}
-                  onCheckedChange={(details) => {
-                    setIsTargetModelReasoning(!!details.checked);
-                  }}
-                >
-                  <Checkbox.HiddenInput />
-                  <Checkbox.Control />
-                  <Checkbox.Label>推理模型</Checkbox.Label>
-                </Checkbox.Root>
-              </Box>
+              <Dialog.Body>
+                <VStack gap={4} align="stretch">
+                  <Box>
+                    <Text mb={1} fontSize="sm" fontWeight="medium">目标模型</Text>
+                    <Select.Root
+                      collection={modelOptionsCollection}
+                      size="sm"
+                      onValueChange={(details) => setSelectedTargetModel(details.value?.[0])}
+                      value={selectedTargetModel ? [selectedTargetModel] : []}
+                    >
+                      <Select.HiddenSelect />
+                      <Select.Control>
+                        <Select.Trigger>
+                          <Select.ValueText placeholder="选择目标模型" />
+                        </Select.Trigger>
+                        <Select.IndicatorGroup>
+                          <Select.Indicator />
+                        </Select.IndicatorGroup>
+                      </Select.Control>
+                      <Portal container={contentRef}>
+                        <Select.Positioner>
+                          <Select.Content>
+                            {modelOptionsCollection.items.map((modelItem: ModelOption) => (
+                              <Select.Item item={modelItem} key={modelItem.value}>
+                                {modelItem.label}
+                                <Select.ItemIndicator />
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Positioner>
+                      </Portal>
+                    </Select.Root>
+                  </Box>
+                  
+                  <Box>
+                    <Checkbox.Root
+                      checked={isTargetModelReasoning}
+                      onCheckedChange={(details) => {
+                        setIsTargetModelReasoning(!!details.checked);
+                      }}
+                    >
+                      <Checkbox.HiddenInput />
+                      <Checkbox.Control />
+                      <Checkbox.Label>推理模型</Checkbox.Label>
+                    </Checkbox.Root>
+                  </Box>
+                  
+                  <Box>
+                    <Text mb={1} fontSize="sm" fontWeight="medium">优化模型</Text>
+                    <Select.Root
+                      collection={modelOptionsCollection}
+                      size="sm"
+                      onValueChange={(details) => setSelectedOptimizationModel(details.value?.[0])}
+                      value={selectedOptimizationModel ? [selectedOptimizationModel] : []}
+                    >
+                      <Select.HiddenSelect />
+                      <Select.Control>
+                        <Select.Trigger>
+                          <Select.ValueText placeholder="选择优化模型" />
+                        </Select.Trigger>
+                        <Select.IndicatorGroup>
+                          <Select.Indicator />
+                        </Select.IndicatorGroup>
+                      </Select.Control>
+                      <Portal container={contentRef}>
+                        <Select.Positioner>
+                          <Select.Content>
+                            {modelOptionsCollection.items.map((modelItem: ModelOption) => (
+                              <Select.Item item={modelItem} key={modelItem.value}>
+                                {modelItem.label}
+                                <Select.ItemIndicator />
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Positioner>
+                      </Portal>
+                    </Select.Root>
+                  </Box>
+                  
+                  <Box>
+                    <Checkbox.Root
+                      checked={isOptimizationModelReasoning}
+                      onCheckedChange={(details) => {
+                        setIsOptimizationModelReasoning(!!details.checked);
+                      }}
+                    >
+                      <Checkbox.HiddenInput />
+                      <Checkbox.Control />
+                      <Checkbox.Label>推理模型</Checkbox.Label>
+                    </Checkbox.Root>
+                  </Box>
+                  
+                  <Box>
+                    <Checkbox.Root
+                      checked={requireUserFeedback}
+                      onCheckedChange={(details) => {
+                        setRequireUserFeedback(!!details.checked);
+                      }}
+                    >
+                      <Checkbox.HiddenInput />
+                      <Checkbox.Control />
+                      <Checkbox.Label>需要用户反馈</Checkbox.Label>
+                    </Checkbox.Root>
+                  </Box>
+                </VStack>
+              </Dialog.Body>
               
-              <Box>
-                <Text mb={1} fontSize="sm" fontWeight="medium">优化模型</Text>
-                <Select.Root
-                  collection={modelOptionsCollection}
-                  size="sm"
-                  onValueChange={(details) => setSelectedOptimizationModel(details.value?.[0])}
-                  value={selectedOptimizationModel ? [selectedOptimizationModel] : []}
-                >
-                  <Select.HiddenSelect />
-                  <Select.Control>
-                    <Select.Trigger>
-                      <Select.ValueText placeholder="选择优化模型" />
-                    </Select.Trigger>
-                    <Select.IndicatorGroup>
-                      <Select.Indicator />
-                    </Select.IndicatorGroup>
-                  </Select.Control>
-                  <Portal>
-                    <Select.Positioner>
-                      <Select.Content>
-                        {modelOptionsCollection.items.map((modelItem: ModelOption) => (
-                          <Select.Item item={modelItem} key={modelItem.value}>
-                            {modelItem.label}
-                            <Select.ItemIndicator />
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Positioner>
-                  </Portal>
-                </Select.Root>
-              </Box>
-              
-              <Box>
-                <Checkbox.Root
-                  checked={isOptimizationModelReasoning}
-                  onCheckedChange={(details) => {
-                    setIsOptimizationModelReasoning(!!details.checked);
-                  }}
-                >
-                  <Checkbox.HiddenInput />
-                  <Checkbox.Control />
-                  <Checkbox.Label>推理模型</Checkbox.Label>
-                </Checkbox.Root>
-              </Box>
-              
-              <Box>
-                <Checkbox.Root
-                  checked={requireUserFeedback}
-                  onCheckedChange={(details) => {
-                    setRequireUserFeedback(!!details.checked);
-                  }}
-                >
-                  <Checkbox.HiddenInput />
-                  <Checkbox.Control />
-                  <Checkbox.Label>需要用户反馈</Checkbox.Label>
-                </Checkbox.Root>
-              </Box>
-              <HStack justifyContent="flex-end" gap={3} mt={2}>
-                <Button size="sm" variant="outline" onClick={handleCancelAdvancedSettings}>
-                  <FiXCircle />
-                  取消
-                </Button>
+              <Dialog.Footer>
+                <Dialog.ActionTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={handleCancelAdvancedSettings}>
+                    <FiXCircle />
+                    取消
+                  </Button>
+                </Dialog.ActionTrigger>
                 <Button size="sm" onClick={handleSaveAdvancedSettings}>
                   <FiSave />
                   保存
                 </Button>
-              </HStack>
-            </VStack>
-          </Box>
-        </Box>
-      )}
+              </Dialog.Footer>
+              
+              <Dialog.CloseTrigger asChild>
+                <CloseButton size="sm" position="absolute" top={3} right={3} />
+              </Dialog.CloseTrigger>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
       
       {/* 删除确认对话框 */}
-      {isDeleteOpen && (
+      <Dialog.Root open={isDeleteOpen} onOpenChange={onDeleteClose}>
         <Portal>
-          <Box
-            position="fixed"
-            top="0"
-            left="0"
-            right="0"
-            bottom="0"
-            bg="rgba(0,0,0,0.4)"
-            zIndex="1000"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Box
-              bg="white"
-              borderRadius="md"
-              maxW="400px"
-              w="90%"
-              p={4}
-              position="relative"
-            >
-              <Heading size="sm" mb={3}>确认删除</Heading>
-              <Box position="absolute" top="10px" right="10px" cursor="pointer" onClick={onDeleteClose}>
-                ✕
-              </Box>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="400px">
+              <Dialog.Header>
+                <Dialog.Title>确认删除</Dialog.Title>
+              </Dialog.Header>
               
-              <Text mb={2}>
-                确定要删除任务 "{taskName}" 吗？此操作无法撤销。
-              </Text>
+              <Dialog.Body>
+                <Text mb={2}>
+                  确定要删除任务 "{taskName}" 吗？此操作无法撤销。
+                </Text>
+              </Dialog.Body>
               
-              <Flex justifyContent="flex-end" gap={3}>
-                <Button size="sm" variant="outline" onClick={onDeleteClose}>
-                  <FiXCircle />
-                  取消
-                </Button>
+              <Dialog.Footer>
+                <Dialog.ActionTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={onDeleteClose}>
+                    <FiXCircle />
+                    取消
+                  </Button>
+                </Dialog.ActionTrigger>
                 <Button 
                   size="sm" 
                   colorScheme="red" 
@@ -409,11 +391,15 @@ export function OptimizationHeader({
                   <FiTrash2 />
                   删除
                 </Button>
-              </Flex>
-            </Box>
-          </Box>
+              </Dialog.Footer>
+              
+              <Dialog.CloseTrigger asChild>
+                <CloseButton size="sm" position="absolute" top={3} right={3} />
+              </Dialog.CloseTrigger>
+            </Dialog.Content>
+          </Dialog.Positioner>
         </Portal>
-      )}
+      </Dialog.Root>
     </Box>
   )
 }

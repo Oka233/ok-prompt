@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Flex,
@@ -11,6 +12,8 @@ import {
   VStack,
   Portal,
   Image,
+  CloseButton,
+  Dialog,
 } from '@chakra-ui/react'
 import { Table } from '@chakra-ui/react'
 import { toaster } from "@/components/ui/toaster"
@@ -62,6 +65,7 @@ const modelTypeOptions = [
 export function ModelManagement() {
   const { models, addModel, updateModel, deleteModel } = useOptimizationStore()
   const { open: isOpen, onOpen, onClose } = useDisclosure()
+  const { open: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
   const [isEditing, setIsEditing] = useState(false)
   const [currentModel, setCurrentModel] = useState<ModelConfig | null>(null)
   const [modelName, setModelName] = useState('')
@@ -75,7 +79,6 @@ export function ModelManagement() {
   
   // 删除确认对话框状态
   const [deleteModelId, setDeleteModelId] = useState<string | null>(null)
-  const { open: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
 
   const initialRef = useRef<HTMLInputElement>(null)
   
@@ -358,45 +361,31 @@ export function ModelManagement() {
       )}
       
       {/* 删除确认对话框 */}
-      {isDeleteOpen && deleteModelId && (
+      <Dialog.Root open={isDeleteOpen} onOpenChange={onDeleteClose}>
         <Portal>
-          <Box
-            position="fixed"
-            top="0"
-            left="0"
-            right="0"
-            bottom="0"
-            bg="rgba(0,0,0,0.4)"
-            zIndex="1000"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Box
-              bg="white"
-              borderRadius="md"
-              maxW="400px"
-              w="90%"
-              p={4}
-              position="relative"
-            >
-              <Heading size="sm" mb={3}>确认删除</Heading>
-              <Box position="absolute" top="10px" right="10px" cursor="pointer" onClick={onDeleteClose}>
-                ✕
-              </Box>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="400px">
+              <Dialog.Header>
+                <Dialog.Title>确认删除</Dialog.Title>
+              </Dialog.Header>
               
-              <Text mb={2}>
-                确定要删除模型 "{models.find(m => m.id === deleteModelId)?.name}" 吗？
-              </Text>
-              <Text fontSize="sm" color="gray.500" mb={4}>
-                如果有任务正在使用此模型，将无法删除。
-              </Text>
+              <Dialog.Body>
+                <Text mb={2}>
+                  确定要删除模型 "{models.find(m => m.id === deleteModelId)?.name}" 吗？
+                </Text>
+                <Text fontSize="sm" color="gray.500">
+                  如果有任务正在使用此模型，将无法删除。
+                </Text>
+              </Dialog.Body>
               
-              <Flex justifyContent="flex-end" gap={3}>
-                <Button size="sm" variant="outline" onClick={onDeleteClose}>
-                  <FiXCircle />
-                  取消
-                </Button>
+              <Dialog.Footer>
+                <Dialog.ActionTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={onDeleteClose}>
+                    <FiXCircle />
+                    取消
+                  </Button>
+                </Dialog.ActionTrigger>
                 <Button 
                   size="sm" 
                   colorScheme="red" 
@@ -405,154 +394,150 @@ export function ModelManagement() {
                   <FiTrash2 />
                   删除
                 </Button>
-              </Flex>
-            </Box>
-          </Box>
+              </Dialog.Footer>
+              
+              <Dialog.CloseTrigger asChild>
+                <CloseButton size="sm" position="absolute" top={3} right={3} />
+              </Dialog.CloseTrigger>
+            </Dialog.Content>
+          </Dialog.Positioner>
         </Portal>
-      )}
+      </Dialog.Root>
       
       {/* 添加/编辑模型对话框 */}
-      {isOpen && (
-        <Box
-          position="fixed"
-          top="0"
-          left="0"
-          right="0"
-          bottom="0"
-          bg="rgba(0,0,0,0.4)"
-          zIndex="1000"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Box
-            bg="white"
-            borderRadius="md"
-            maxW="800px"
-            w="90%"
-            p={6}
-            position="relative"
-          >
-            <Heading size="md" mb={4}>{isEditing ? '编辑模型' : '添加模型'}</Heading>
-            <Box position="absolute" top="10px" right="10px" cursor="pointer" onClick={onClose}>
-              ✕
-            </Box>
-            
-            {error && (
-              <Box mb={4} p={3} bg="red.50" color="red.600" borderRadius="md">
-                <Text>{error}</Text>
-              </Box>
-            )}
-            
-            <Flex gap={6}>
-              {/* 左侧模型类型选择 */}
-              <Box width="250px">
-                <Text mb={2} fontWeight="medium">模型供应商</Text>
-                <RadioCard.Root value={selectedModelType}>
-                  <VStack align="stretch">
-                    {modelTypeOptions.map((item) => (
-                      <RadioCard.Item
-                        key={item.value}
-                        value={item.value}
-                        width="full"
-                        onClick={() => setSelectedModelType(item.value)}
-                        transition="150ms ease-in-out"
-                        cursor="pointer"
-                        _hover={{ bg: 'gray.100' }}
-                      >
-                        <RadioCard.ItemHiddenInput />
-                        <RadioCard.ItemControl p={2} pr={4} alignItems="center">
-                          <RadioCard.ItemContent>
-                            <Flex alignItems="center" gap={3}>
-                              <Box
-                                p={1.5}
-                                bg="gray.50"
-                                borderRadius="md"
-                                display="flex"
-                                alignItems="center"
-                                justifyContent="center"
-                                width="36px"
-                                height="36px"
-                              >
-                                <Image 
-                                  src={item.icon} 
-                                  alt={item.title} 
-                                  boxSize="24px" 
-                                  borderRadius="sm"
-                                  objectFit="contain"
-                                />
-                              </Box>
-                              <Box>
-                                <RadioCard.ItemText fontWeight="medium">{item.title}</RadioCard.ItemText>
-                                <Text fontSize="xs" color="gray.500">{item.description}</Text>
-                              </Box>
-                            </Flex>
-                          </RadioCard.ItemContent>
-                          <RadioCard.ItemIndicator />
-                        </RadioCard.ItemControl>
-                      </RadioCard.Item>
-                    ))}
-                  </VStack>
-                </RadioCard.Root>
-              </Box>
+      <Dialog.Root open={isOpen} onOpenChange={onClose}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="800px">
+              <Dialog.Header>
+                <Dialog.Title>{isEditing ? '编辑模型' : '添加模型'}</Dialog.Title>
+              </Dialog.Header>
               
-              {/* 右侧表单字段 */}
-              <Box flex="1">
-                <Box mb={4}>
-                  <Text mb={2} fontWeight="medium">模型名称</Text>
-                  <Input
-                    ref={initialRef}
-                    placeholder="例如: qwen3-235b-a22b"
-                    value={modelName}
-                    onChange={handleModelNameChange}
-                  />
-                </Box>
-
-                <Box mb={4}>
-                  <Text mb={2} fontWeight="medium">展示名称</Text>
-                  <Input
-                    placeholder="用于界面显示的名称"
-                    value={displayName}
-                    onChange={handleDisplayNameChange}
-                  />
-                </Box>
-
-                <Box mb={4}>
-                  <Text mb={2} fontWeight="medium">API密钥</Text>
-                  <Input
-                    placeholder="输入API密钥"
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  />
-                </Box>
-
-                {selectedModelType === ModelType.OPENAI_COMPATIBLE && (
-                  <Box mb={4}>
-                    <Text mb={2} fontWeight="medium">基础URL</Text>
-                    <Input
-                      placeholder="例如: https://api.example.com/v1"
-                      value={baseUrl}
-                      onChange={(e) => setBaseUrl(e.target.value)}
-                    />
-                  </Box>
+              <Dialog.Body>
+                {error && (
+                  <Alert.Root status="error" p={2} mb={4}>
+                    <Alert.Indicator />
+                    <Alert.Title>{error}</Alert.Title>
+                  </Alert.Root>
                 )}
-              </Box>
-            </Flex>
+                
+                <Flex gap={6}>
+                  {/* 左侧模型类型选择 */}
+                  <Box width="250px">
+                    <Text mb={2} fontWeight="medium">模型供应商</Text>
+                    <RadioCard.Root value={selectedModelType}>
+                      <VStack align="stretch">
+                        {modelTypeOptions.map((item) => (
+                          <RadioCard.Item
+                            key={item.value}
+                            value={item.value}
+                            width="full"
+                            onClick={() => setSelectedModelType(item.value)}
+                            transition="150ms ease-in-out"
+                            cursor="pointer"
+                            _hover={{ bg: 'gray.100' }}
+                          >
+                            <RadioCard.ItemHiddenInput />
+                            <RadioCard.ItemControl p={2} pr={4} alignItems="center">
+                              <RadioCard.ItemContent>
+                                <Flex alignItems="center" gap={3}>
+                                  <Box
+                                    p={1.5}
+                                    bg="gray.50"
+                                    borderRadius="md"
+                                    display="flex"
+                                    alignItems="center"
+                                    justifyContent="center"
+                                    width="36px"
+                                    height="36px"
+                                  >
+                                    <Image 
+                                      src={item.icon} 
+                                      alt={item.title} 
+                                      boxSize="24px" 
+                                      borderRadius="sm"
+                                      objectFit="contain"
+                                    />
+                                  </Box>
+                                  <Box>
+                                    <RadioCard.ItemText fontWeight="medium">{item.title}</RadioCard.ItemText>
+                                    <Text fontSize="xs" color="gray.500">{item.description}</Text>
+                                  </Box>
+                                </Flex>
+                              </RadioCard.ItemContent>
+                              <RadioCard.ItemIndicator />
+                            </RadioCard.ItemControl>
+                          </RadioCard.Item>
+                        ))}
+                      </VStack>
+                    </RadioCard.Root>
+                  </Box>
+                  
+                  {/* 右侧表单字段 */}
+                  <Box flex="1">
+                    <Box mb={4}>
+                      <Text mb={2} fontWeight="medium">模型名称</Text>
+                      <Input
+                        ref={initialRef}
+                        placeholder="例如: qwen3-235b-a22b"
+                        value={modelName}
+                        onChange={handleModelNameChange}
+                      />
+                    </Box>
 
-            <Flex justifyContent="flex-end" gap={3} mt={6}>
-              <Button size="sm" variant="outline" onClick={onClose}>
-                <FiXCircle />
-                取消
-              </Button>
-              <Button size="sm" onClick={handleSubmit}>
-                <FiSave />
-                {isEditing ? '保存' : '添加'}
-              </Button>
-            </Flex>
-          </Box>
-        </Box>
-      )}
+                    <Box mb={4}>
+                      <Text mb={2} fontWeight="medium">展示名称</Text>
+                      <Input
+                        placeholder="用于界面显示的名称"
+                        value={displayName}
+                        onChange={handleDisplayNameChange}
+                      />
+                    </Box>
+
+                    <Box mb={4}>
+                      <Text mb={2} fontWeight="medium">API密钥</Text>
+                      <Input
+                        placeholder="输入API密钥"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                      />
+                    </Box>
+
+                    {selectedModelType === ModelType.OPENAI_COMPATIBLE && (
+                      <Box mb={4}>
+                        <Text mb={2} fontWeight="medium">基础URL</Text>
+                        <Input
+                          placeholder="例如: https://api.example.com/v1"
+                          value={baseUrl}
+                          onChange={(e) => setBaseUrl(e.target.value)}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+                </Flex>
+              </Dialog.Body>
+              
+              <Dialog.Footer>
+                <Dialog.ActionTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={onClose}>
+                    <FiXCircle />
+                    取消
+                  </Button>
+                </Dialog.ActionTrigger>
+                <Button size="sm" onClick={handleSubmit}>
+                  <FiSave />
+                  {isEditing ? '保存' : '添加'}
+                </Button>
+              </Dialog.Footer>
+              
+              <Dialog.CloseTrigger asChild>
+                <CloseButton size="sm" position="absolute" top={3} right={3} />
+              </Dialog.CloseTrigger>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
     </Box>
   )
 } 
