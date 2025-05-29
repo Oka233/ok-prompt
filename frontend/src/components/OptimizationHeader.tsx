@@ -69,8 +69,7 @@ export function OptimizationHeader({
   const modelOptionsCollection = createListCollection<ModelOption>({
     items: models.map(model => ({ label: model.displayName, value: model.id }))
   });
-  const emptyModelOptionMessage: ModelOption = { label: "选择一个模型", value: "__placeholder__", disabled: true };
-  
+
   const handleDelete = async () => {
     await deleteTask(taskId);
     onDeleteClose();
@@ -253,7 +252,7 @@ export function OptimizationHeader({
                 <Select.Root
                   collection={modelOptionsCollection}
                   size="sm"
-                  onValueChange={(details) => setSelectedTargetModel(details.value?.[0] === emptyModelOptionMessage.value ? undefined : details.value?.[0] || undefined)}
+                  onValueChange={(details) => setSelectedTargetModel(details.value?.[0])}
                   value={selectedTargetModel ? [selectedTargetModel] : []}
                 >
                   <Select.HiddenSelect />
@@ -268,7 +267,6 @@ export function OptimizationHeader({
                   <Portal>
                     <Select.Positioner>
                       <Select.Content>
-                        <Select.Item item={emptyModelOptionMessage}>{emptyModelOptionMessage.label}</Select.Item>
                         {modelOptionsCollection.items.map((modelItem: ModelOption) => (
                           <Select.Item item={modelItem} key={modelItem.value}>
                             {modelItem.label}
@@ -299,7 +297,7 @@ export function OptimizationHeader({
                 <Select.Root
                   collection={modelOptionsCollection}
                   size="sm"
-                  onValueChange={(details) => setSelectedOptimizationModel(details.value?.[0] === emptyModelOptionMessage.value ? undefined : details.value?.[0] || undefined)}
+                  onValueChange={(details) => setSelectedOptimizationModel(details.value?.[0])}
                   value={selectedOptimizationModel ? [selectedOptimizationModel] : []}
                 >
                   <Select.HiddenSelect />
@@ -314,7 +312,6 @@ export function OptimizationHeader({
                   <Portal>
                     <Select.Positioner>
                       <Select.Content>
-                        <Select.Item item={emptyModelOptionMessage}>{emptyModelOptionMessage.label}</Select.Item>
                         {modelOptionsCollection.items.map((modelItem: ModelOption) => (
                           <Select.Item item={modelItem} key={modelItem.value}>
                             {modelItem.label}

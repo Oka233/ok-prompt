@@ -14,7 +14,9 @@ export interface TestSet {
 export enum ModelType {
   OPENAI = 'openai',
   OPENAI_COMPATIBLE = 'openai_compatible',
-  GOOGLE = 'google'
+  GOOGLE = 'google',
+  DASHSCOPE = 'dashscope',
+  DEEPSEEK = 'deepseek'
 }
 
 // 模型配置类型

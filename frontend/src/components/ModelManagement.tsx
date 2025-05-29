@@ -10,6 +10,7 @@ import {
   RadioCard,
   VStack,
   Portal,
+  Image,
 } from '@chakra-ui/react'
 import { Table } from '@chakra-ui/react'
 import { toaster } from "@/components/ui/toaster"
@@ -18,23 +19,44 @@ import { useState, useRef } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 import { ModelConfig, ModelType } from '@/types/optimization'
 
+// 导入模型图标
+import openaiIcon from '@/assets/providers/openai.jpeg'
+import geminiIcon from '@/assets/providers/gemini.png'
+import dashscopeIcon from '@/assets/providers/bailian.png'
+import deepseekIcon from '@/assets/providers/deepseek.png'
+
 // 模型类型配置
 const modelTypeOptions = [
-  { 
-    value: ModelType.OPENAI, 
-    title: 'OpenAI', 
-    description: '使用OpenAI官方API' 
+  {
+    value: ModelType.DASHSCOPE,
+    title: '阿里云百炼',
+    description: '使用阿里云百炼API',
+    icon: dashscopeIcon
   },
-  { 
-    value: ModelType.OPENAI_COMPATIBLE, 
-    title: 'OpenAI兼容', 
-    description: '使用兼容OpenAI接口的API' 
+  {
+    value: ModelType.DEEPSEEK,
+    title: 'DeepSeek',
+    description: '使用DeepSeek API',
+    icon: deepseekIcon
   },
-  { 
-    value: ModelType.GOOGLE, 
-    title: 'Google', 
-    description: '使用Google AI API' 
-  }
+  {
+    value: ModelType.GOOGLE,
+    title: 'Gemini',
+    description: '使用Google AI API',
+    icon: geminiIcon
+  },
+  {
+    value: ModelType.OPENAI,
+    title: 'OpenAI',
+    description: '使用OpenAI API',
+    icon: openaiIcon
+  },
+  {
+    value: ModelType.OPENAI_COMPATIBLE,
+    title: 'OpenAI兼容',
+    description: '兼容OpenAI接口的API',
+    icon: openaiIcon
+  },
 ]
 
 export function ModelManagement() {
@@ -46,8 +68,10 @@ export function ModelManagement() {
   const [displayName, setDisplayName] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
-  const [selectedModelType, setSelectedModelType] = useState<ModelType>(ModelType.OPENAI)
+  const [selectedModelType, setSelectedModelType] = useState<ModelType>(modelTypeOptions[0].value)
   const [error, setError] = useState<string | null>(null)
+  // 添加状态变量跟踪用户是否手动编辑过展示名称
+  const [isDisplayNameEdited, setIsDisplayNameEdited] = useState(false)
   
   // 删除确认对话框状态
   const [deleteModelId, setDeleteModelId] = useState<string | null>(null)
@@ -62,8 +86,9 @@ export function ModelManagement() {
     setDisplayName('')
     setApiKey('')
     setBaseUrl('')
-    setSelectedModelType(ModelType.OPENAI)
+    setSelectedModelType(modelTypeOptions[0].value)
     setError(null)
+    setIsDisplayNameEdited(false)
     onOpen()
   }
   
@@ -76,6 +101,7 @@ export function ModelManagement() {
     setBaseUrl(model.baseUrl || '')
     setSelectedModelType(model.modelType)
     setError(null)
+    setIsDisplayNameEdited(true) // 编辑模式下默认认为展示名称已编辑
     onOpen()
   }
   
@@ -185,9 +211,18 @@ export function ModelManagement() {
     const newName = e.target.value
     setModelName(newName)
     
-    // 如果是新建模型或展示名称为空，则自动设置展示名称
-    if (!isEditing || !displayName.trim()) {
+    // 只有在用户没有手动编辑过展示名称的情况下，才自动设置展示名称
+    if (!isDisplayNameEdited) {
       setDisplayName(newName)
+    }
+  }
+  
+  // 处理展示名称变化
+  const handleDisplayNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDisplayName(e.target.value)
+    // 只要用户手动修改了展示名称，就标记为已编辑
+    if (e.target.value !== modelName) {
+      setIsDisplayNameEdited(true)
     }
   }
   
@@ -226,9 +261,7 @@ export function ModelManagement() {
               <Table.Row>
                 <Table.ColumnHeader>模型名称</Table.ColumnHeader>
                 <Table.ColumnHeader>展示名称</Table.ColumnHeader>
-                <Table.ColumnHeader>类型</Table.ColumnHeader>
                 <Table.ColumnHeader>API密钥</Table.ColumnHeader>
-                <Table.ColumnHeader>基础URL</Table.ColumnHeader>
                 <Table.ColumnHeader width="100px">操作</Table.ColumnHeader>
               </Table.Row>
             </Table.Header>
@@ -236,16 +269,44 @@ export function ModelManagement() {
               {models.map(model => (
                 <Table.Row key={model.id}>
                   <Table.Cell>
-                    <Text 
-                      fontSize="sm" 
-                      overflow="hidden" 
-                      textOverflow="ellipsis" 
-                      whiteSpace="nowrap"
-                      lineClamp="2"
-                      title={model.name}
-                    >
-                      {model.name}
-                    </Text>
+                    <Flex alignItems="center" gap={2}>
+                      <Box 
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        width="24px"
+                        height="24px"
+                        minWidth="24px"
+                        minHeight="24px"
+                        title={getModelTypeName(model.modelType)}
+                        flexShrink={0}
+                        bg="gray.50"
+                        borderRadius="sm"
+                      >
+                        <Image 
+                          src={modelTypeOptions.find(opt => opt.value === model.modelType)?.icon} 
+                          alt={getModelTypeName(model.modelType)}
+                          width="20px" 
+                          height="20px"
+                          minWidth="20px"
+                          minHeight="20px"
+                          maxWidth="20px"
+                          maxHeight="20px"
+                          borderRadius="sm"
+                          objectFit="contain"
+                        />
+                      </Box>
+                      <Text 
+                        fontSize="sm" 
+                        overflow="hidden" 
+                        textOverflow="ellipsis" 
+                        whiteSpace="nowrap"
+                        lineClamp="2"
+                        title={model.name}
+                      >
+                        {model.name}
+                      </Text>
+                    </Flex>
                   </Table.Cell>
                   <Table.Cell>
                     <Text 
@@ -266,33 +327,9 @@ export function ModelManagement() {
                       textOverflow="ellipsis" 
                       whiteSpace="nowrap"
                       lineClamp="2"
-                      title={getModelTypeName(model.modelType)}
-                    >
-                      {getModelTypeName(model.modelType)}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text 
-                      fontSize="sm" 
-                      overflow="hidden" 
-                      textOverflow="ellipsis" 
-                      whiteSpace="nowrap"
-                      lineClamp="2"
                       title={maskApiKey(model.apiKey)}
                     >
                       {maskApiKey(model.apiKey)}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text 
-                      fontSize="sm" 
-                      overflow="hidden" 
-                      textOverflow="ellipsis" 
-                      whiteSpace="nowrap"
-                      lineClamp="2"
-                      title={model.baseUrl}
-                    >
-                      {model.baseUrl}
                     </Text>
                   </Table.Cell>
                   <Table.Cell>
@@ -410,20 +447,46 @@ export function ModelManagement() {
             <Flex gap={6}>
               {/* 左侧模型类型选择 */}
               <Box width="250px">
-                <Text mb={2} fontWeight="medium">模型类型</Text>
+                <Text mb={2} fontWeight="medium">模型供应商</Text>
                 <RadioCard.Root value={selectedModelType}>
-                  <VStack align="stretch" gap={2}>
+                  <VStack align="stretch">
                     {modelTypeOptions.map((item) => (
                       <RadioCard.Item
                         key={item.value}
                         value={item.value}
                         width="full"
                         onClick={() => setSelectedModelType(item.value)}
+                        transition="150ms ease-in-out"
+                        cursor="pointer"
+                        _hover={{ bg: 'gray.100' }}
                       >
                         <RadioCard.ItemHiddenInput />
-                        <RadioCard.ItemControl>
+                        <RadioCard.ItemControl p={2} pr={4} alignItems="center">
                           <RadioCard.ItemContent>
-                            <RadioCard.ItemText>{item.title}</RadioCard.ItemText>
+                            <Flex alignItems="center" gap={3}>
+                              <Box
+                                p={1.5}
+                                bg="gray.50"
+                                borderRadius="md"
+                                display="flex"
+                                alignItems="center"
+                                justifyContent="center"
+                                width="36px"
+                                height="36px"
+                              >
+                                <Image 
+                                  src={item.icon} 
+                                  alt={item.title} 
+                                  boxSize="24px" 
+                                  borderRadius="sm"
+                                  objectFit="contain"
+                                />
+                              </Box>
+                              <Box>
+                                <RadioCard.ItemText fontWeight="medium">{item.title}</RadioCard.ItemText>
+                                <Text fontSize="xs" color="gray.500">{item.description}</Text>
+                              </Box>
+                            </Flex>
                           </RadioCard.ItemContent>
                           <RadioCard.ItemIndicator />
                         </RadioCard.ItemControl>
@@ -436,26 +499,26 @@ export function ModelManagement() {
               {/* 右侧表单字段 */}
               <Box flex="1">
                 <Box mb={4}>
-                  <Text mb={2} fontWeight="medium">模型名称 *</Text>
+                  <Text mb={2} fontWeight="medium">模型名称</Text>
                   <Input
                     ref={initialRef}
-                    placeholder="例如: GPT-4"
+                    placeholder="例如: qwen3-235b-a22b"
                     value={modelName}
                     onChange={handleModelNameChange}
                   />
                 </Box>
 
                 <Box mb={4}>
-                  <Text mb={2} fontWeight="medium">展示名称 *</Text>
+                  <Text mb={2} fontWeight="medium">展示名称</Text>
                   <Input
                     placeholder="用于界面显示的名称"
                     value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
+                    onChange={handleDisplayNameChange}
                   />
                 </Box>
 
                 <Box mb={4}>
-                  <Text mb={2} fontWeight="medium">API密钥 *</Text>
+                  <Text mb={2} fontWeight="medium">API密钥</Text>
                   <Input
                     placeholder="输入API密钥"
                     type="password"
@@ -466,7 +529,7 @@ export function ModelManagement() {
 
                 {selectedModelType === ModelType.OPENAI_COMPATIBLE && (
                   <Box mb={4}>
-                    <Text mb={2} fontWeight="medium">基础URL *</Text>
+                    <Text mb={2} fontWeight="medium">基础URL</Text>
                     <Input
                       placeholder="例如: https://api.example.com/v1"
                       value={baseUrl}

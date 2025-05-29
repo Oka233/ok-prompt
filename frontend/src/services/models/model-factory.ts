@@ -3,7 +3,11 @@ import { OpenAIAdapter } from './openai-adapter';
 import { GoogleAdapter } from './google-adapter';
 import { ModelConfig, ModelType } from '@/types/optimization';
 
-const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
+const OPENAI_BASE_URL = 'https://api.openai.com/v1';
+
+const DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/v1';
 
 export class ModelFactory {
   static createModel(config: ModelConfig, isReasoning: boolean = false): ModelProvider {
@@ -13,7 +17,19 @@ export class ModelFactory {
         return new OpenAIAdapter(
           config.apiKey, 
           config.name, 
-          DEFAULT_OPENAI_BASE_URL
+          OPENAI_BASE_URL
+        );
+      case ModelType.DASHSCOPE:
+        return new OpenAIAdapter(
+          config.apiKey,
+          config.name,
+          DASHSCOPE_BASE_URL
+        );
+      case ModelType.DEEPSEEK:
+        return new OpenAIAdapter(
+          config.apiKey,
+          config.name,
+          DEEPSEEK_BASE_URL
         );
       case ModelType.OPENAI_COMPATIBLE:
         if (!config.baseUrl) {
