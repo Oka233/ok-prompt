@@ -21,50 +21,43 @@ import { FiTrash2, FiSettings, FiSave, FiXCircle, FiPlay, FiStopCircle } from 'r
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 import { useState, useEffect, useRef } from 'react'
 
-interface OptimizationHeaderProps {
-  taskId: string
-  taskName: string
-  datasetName: string
-  mode: string
-  iterationCount: number
-}
-
 interface ModelOption {
   label: string;
   value: string;
   disabled?: boolean;
 }
 
-export function OptimizationHeader({
-  taskId,
-  taskName,
-  datasetName,
-  mode,
-  iterationCount
-}: OptimizationHeaderProps) {
+export function OptimizationHeader() {
   const direction = useBreakpointValue({ base: 'column', md: 'row' }) || 'column';
   const isMobile = direction === 'column';
-  const { deleteTask, models, tasks, updateTaskModels, startOptimization, stopOptimization, updateTaskFeedbackSetting, updateTaskReasoningSettings } = useOptimizationStore();
+  const { deleteTask, models, tasks, updateTaskModels, startOptimization, stopOptimization, updateTaskFeedbackSetting, updateTaskReasoningSettings, currentTaskId } = useOptimizationStore();
   const { open, onOpen, onClose } = useDisclosure();
   
   // 删除确认对话框状态
   const { open: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
 
-  const currentTask = tasks.find(t => t.id === taskId);
-  const status = currentTask?.status || 'not_started';
+  // 使用类型断言，因为我们确定currentTaskId存在
+  const taskId = currentTaskId as string;
+  
+  // 直接从 store 获取当前任务
+  const currentTask = tasks.find(t => t.id === taskId)!;
+  
+  // 既然 currentTaskId 一定存在，就不需要检查 currentTask 是否为空
+  const status = currentTask.status || 'not_started';
 
-  const [selectedTargetModel, setSelectedTargetModel] = useState<string | undefined>(currentTask?.targetModelId);
-  const [selectedOptimizationModel, setSelectedOptimizationModel] = useState<string | undefined>(currentTask?.optimizationModelId);
-  const [requireUserFeedback, setRequireUserFeedback] = useState(currentTask?.requireUserFeedback || false);
-  const [isTargetModelReasoning, setIsTargetModelReasoning] = useState(currentTask?.isTargetModelReasoning || false);
-  const [isOptimizationModelReasoning, setIsOptimizationModelReasoning] = useState(currentTask?.isOptimizationModelReasoning || false);
+  const [selectedTargetModel, setSelectedTargetModel] = useState<string | undefined>(currentTask.targetModelId);
+  const [selectedOptimizationModel, setSelectedOptimizationModel] = useState<string | undefined>(currentTask.optimizationModelId);
+  const [requireUserFeedback, setRequireUserFeedback] = useState(currentTask.requireUserFeedback || false);
+  const [isTargetModelReasoning, setIsTargetModelReasoning] = useState(currentTask.isTargetModelReasoning || false);
+  const [isOptimizationModelReasoning, setIsOptimizationModelReasoning] = useState(currentTask.isOptimizationModelReasoning || false);
 
   useEffect(() => {
-    setSelectedTargetModel(currentTask?.targetModelId);
-    setSelectedOptimizationModel(currentTask?.optimizationModelId);
-    setRequireUserFeedback(currentTask?.requireUserFeedback || false);
-    setIsTargetModelReasoning(currentTask?.isTargetModelReasoning || false);
-    setIsOptimizationModelReasoning(currentTask?.isOptimizationModelReasoning || false);
+    // 移除不必要的检查
+    setSelectedTargetModel(currentTask.targetModelId);
+    setSelectedOptimizationModel(currentTask.optimizationModelId);
+    setRequireUserFeedback(currentTask.requireUserFeedback || false);
+    setIsTargetModelReasoning(currentTask.isTargetModelReasoning || false);
+    setIsOptimizationModelReasoning(currentTask.isOptimizationModelReasoning || false);
   }, [currentTask?.targetModelId, currentTask?.optimizationModelId, currentTask?.requireUserFeedback, currentTask?.isTargetModelReasoning, currentTask?.isOptimizationModelReasoning, taskId]);
 
   const contentRef = useRef<HTMLDivElement>(null)
@@ -74,12 +67,13 @@ export function OptimizationHeader({
   });
 
   const handleDelete = async () => {
+    // currentTaskId 一定存在
     await deleteTask(taskId);
     onDeleteClose();
   };
 
   const handleSaveAdvancedSettings = async () => {
-    if (!currentTask) return;
+    // 移除不必要的检查
     
     // 更新模型设置
     await updateTaskModels(taskId, selectedTargetModel, selectedOptimizationModel);
@@ -94,26 +88,25 @@ export function OptimizationHeader({
   };
 
   const handleCancelAdvancedSettings = () => {
-    setSelectedTargetModel(currentTask?.targetModelId);
-    setSelectedOptimizationModel(currentTask?.optimizationModelId);
-    setRequireUserFeedback(currentTask?.requireUserFeedback || false);
-    setIsTargetModelReasoning(currentTask?.isTargetModelReasoning || false);
-    setIsOptimizationModelReasoning(currentTask?.isOptimizationModelReasoning || false);
+    // 移除不必要的检查
+    setSelectedTargetModel(currentTask.targetModelId);
+    setSelectedOptimizationModel(currentTask.optimizationModelId);
+    setRequireUserFeedback(currentTask.requireUserFeedback || false);
+    setIsTargetModelReasoning(currentTask.isTargetModelReasoning || false);
+    setIsOptimizationModelReasoning(currentTask.isOptimizationModelReasoning || false);
     onClose();
   };
 
   const handleStartOptimization = async () => {
-    if (taskId) {
-      await startOptimization(taskId);
-    }
+    // 移除不必要的检查
+    await startOptimization(taskId);
   };
 
   const handleStopOptimization = async () => {
-    if (taskId) {
-      await stopOptimization(taskId);
-    }
+    // 移除不必要的检查
+    await stopOptimization(taskId);
   };
-  
+
   return (
     <Box 
       bg="white" 
@@ -134,11 +127,11 @@ export function OptimizationHeader({
       >
         <Box flexGrow={1}>
           <Heading as="h2" size={{ base: "md", md: "lg" }} fontWeight="semibold" color="gray.800">
-            当前优化任务: {taskName}
+            当前优化任务: {currentTask.name}
           </Heading>
           <Text fontSize="sm" color="gray.500" mt={1}>
-            数据集: <Text as="span" fontWeight="medium" color="gray.700">{datasetName}</Text> | 
-            模式: <Text as="span" fontWeight="medium" color="gray.700">{mode === 'strict' ? '严格模式' : '描述性模式'}</Text>
+            数据集: <Text as="span" fontWeight="medium" color="gray.700">{currentTask.datasetName}</Text> | 
+            模式: <Text as="span" fontWeight="medium" color="gray.700">{currentTask.testSet.mode === 'strict' ? '严格模式' : '描述性模式'}</Text>
           </Text>
         </Box>
         <Box textAlign={isMobile ? "left" : "right"} flexShrink={0}>
@@ -210,13 +203,13 @@ export function OptimizationHeader({
           </Flex>
           <Flex justifyContent={isMobile ? "flex-start" : "flex-end"} gap={4} mt={1}>
             <Text fontSize="sm" color="gray.500">
-              总迭代次数: <Text as="span" fontWeight="medium" color="gray.700">{iterationCount}</Text>
+              总迭代次数: <Text as="span" fontWeight="medium" color="gray.700">{currentTask.promptIterations.length}</Text>
             </Text>
             <Text fontSize="sm" color="gray.500">
-              目标模型: <Text as="span" fontWeight="medium" color="gray.700">输入{currentTask?.targetModelTokenUsage?.promptTokens || 0}/输出{currentTask?.targetModelTokenUsage?.completionTokens || 0}</Text>
+              目标模型: <Text as="span" fontWeight="medium" color="gray.700">输入{currentTask.targetModelTokenUsage?.promptTokens || 0}/输出{currentTask.targetModelTokenUsage?.completionTokens || 0}</Text>
             </Text>
             <Text fontSize="sm" color="gray.500">
-              优化模型: <Text as="span" fontWeight="medium" color="gray.700">输入{currentTask?.optimizationModelTokenUsage?.promptTokens || 0}/输出{currentTask?.optimizationModelTokenUsage?.completionTokens || 0}</Text>
+              优化模型: <Text as="span" fontWeight="medium" color="gray.700">输入{currentTask.optimizationModelTokenUsage?.promptTokens || 0}/输出{currentTask.optimizationModelTokenUsage?.completionTokens || 0}</Text>
             </Text>
           </Flex>
         </Box>
@@ -372,7 +365,7 @@ export function OptimizationHeader({
               
               <Dialog.Body>
                 <Text mb={2}>
-                  确定要删除任务 "{taskName}" 吗？此操作无法撤销。
+                  确定要删除任务 "{currentTask.name}" 吗？此操作无法撤销。
                 </Text>
               </Dialog.Body>
               

@@ -19,14 +19,7 @@ export function DatasetUploadedView() {
 
   return (
     <Flex flexDirection="column" width="100%" height="100%">
-      <OptimizationHeader 
-        taskId={currentTask.id}
-        taskName={currentTask.name}
-        datasetName={currentTask.datasetName}
-        mode={currentTask.testSet.mode}
-        status={getStatusText(currentTask.status)}
-        iterationCount={currentTask.promptIterations.length}
-      />
+      <OptimizationHeader />
 
       <Flex 
         flexDirection={direction}
@@ -56,32 +49,16 @@ export function DatasetUploadedView() {
           borderRadius="lg"
           borderWidth="1px"
           borderColor="gray.200"
-          p={1}
+          p={4}
           overflow="auto"
           height={direction === 'column' ? '100%' : 'auto'}
         >
-          <Box p={3}>
-            <Heading as="h3" size="md" fontWeight="semibold" color="gray.700" mb={3}>
-              测试用例评估详情
-            </Heading>
-          </Box>
+          <Heading as="h3" size="md" fontWeight="semibold" color="gray.700" mb={3}>
+            测试用例评估详情
+          </Heading>
           <TestCaseTable />
         </Box>
       </Flex>
     </Flex>
   )
-}
-
-// 辅助函数：获取状态文本
-function getStatusText(status: string): string {
-  switch (status) {
-    case 'completed':
-      return '已完成 (全部测试用例满分)';
-    case 'in_progress':
-      return '进行中';
-    case 'max_iterations_reached':
-      return '已达最大迭代';
-    default:
-      return '未开始';
-  }
 }
