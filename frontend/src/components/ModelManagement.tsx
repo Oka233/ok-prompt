@@ -156,8 +156,6 @@ export function ModelManagement() {
   useEffect(() => {
     const currentConfig = modelTypeOptions.find(opt => opt.value === selectedModelType);
     const options = currentConfig?.providerOptions || [];
-
-    setBaseUrl('');
     
     if (options.length > 0) {
       // 设置为第一个供应商选项
@@ -166,23 +164,38 @@ export function ModelManagement() {
     } else {
       // 清空供应商选择
       setSelectedProvider('');
+      setBaseUrl('');
     }
   }, [selectedModelType]);
   
   const handleAddModel = () => {
-    setIsEditing(false)
-    setCurrentModel(null)
-    setModelName('')
-    setDisplayName('')
-    setApiKey('')
-    setBaseUrl('')
-    setSelectedModelType(modelTypeOptions[0].value)
-    setSelectedProvider(modelTypeOptions[0].providerOptions[0]?.value || '')
-    setError(null)
-    setIsDisplayNameEdited(false)
-    setIsReasoning(false)
-    onOpen()
-  }
+    setIsEditing(false);
+    setCurrentModel(null);
+    setModelName('');
+    setDisplayName('');
+    setApiKey('');
+
+    const initialModelType = modelTypeOptions[0].value;
+    const initialModelTypeConfig = modelTypeOptions.find(opt => opt.value === initialModelType);
+    const initialProviderOptionsFromConfig = initialModelTypeConfig?.providerOptions || [];
+    
+    let initialBaseUrl = '';
+    let initialSelectedProvider = '';
+
+    if (initialProviderOptionsFromConfig.length > 0 && initialProviderOptionsFromConfig[0]) {
+      initialSelectedProvider = initialProviderOptionsFromConfig[0].value;
+      initialBaseUrl = initialProviderOptionsFromConfig[0].baseUrl;
+    }
+
+    setSelectedModelType(initialModelType);
+    setSelectedProvider(initialSelectedProvider);
+    setBaseUrl(initialBaseUrl);
+
+    setError(null);
+    setIsDisplayNameEdited(false);
+    setIsReasoning(false);
+    onOpen();
+  };
   
   const handleEditModel = (model: ModelConfig) => {
     setIsEditing(true)
