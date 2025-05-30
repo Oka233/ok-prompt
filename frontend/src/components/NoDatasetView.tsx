@@ -57,8 +57,6 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
   const [targetModelId, setTargetModelId] = useState<string | undefined>(undefined);
   const [optimizationModelId, setOptimizationModelId] = useState<string | undefined>(undefined);
   const [requireUserFeedback, setRequireUserFeedback] = useState(false);
-  const [isTargetModelReasoning, setIsTargetModelReasoning] = useState(false);
-  const [isOptimizationModelReasoning, setIsOptimizationModelReasoning] = useState(false);
 
   const modelOptions = useMemo(() => createModelListCollection(models), [models]);
   
@@ -104,9 +102,7 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
         targetModelId,
         optimizationModelId,
         requireUserFeedback,
-        3,
-        isTargetModelReasoning,
-        isOptimizationModelReasoning,
+        3
       );
       
       onUpload();
@@ -319,22 +315,6 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
             </Box>
 
             <Box>
-              <Checkbox.Root
-                defaultChecked={false}
-                onCheckedChange={(details) => {
-                  setIsTargetModelReasoning(!!details.checked);
-                }}
-              >
-                <Checkbox.HiddenInput />
-                <Checkbox.Control />
-                <Checkbox.Label>推理模型</Checkbox.Label>
-              </Checkbox.Root>
-              <Text fontSize="sm" color="gray.500" mt={1}>
-                如果目标模型是推理模型，或为支持推理的模型启用推理，请勾选
-              </Text>
-            </Box>
-
-            <Box>
               <Text mb={2} fontWeight="medium">优化模型</Text>
               <Select.Root 
                 collection={modelOptions} 
@@ -372,22 +352,6 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                   </Select.Positioner>
                 </Portal>
               </Select.Root>
-            </Box>
-
-            <Box>
-              <Checkbox.Root
-                defaultChecked={false}
-                onCheckedChange={(details) => {
-                  setIsOptimizationModelReasoning(!!details.checked);
-                }}
-              >
-                <Checkbox.HiddenInput />
-                <Checkbox.Control />
-                <Checkbox.Label>推理模型</Checkbox.Label>
-              </Checkbox.Root>
-              <Text fontSize="sm" color="gray.500" mt={1}>
-                如果优化模型是推理模型，或为支持推理的模型启用推理，请勾选
-              </Text>
             </Box>
 
             <Box>

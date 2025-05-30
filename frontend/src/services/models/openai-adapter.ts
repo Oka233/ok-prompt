@@ -31,14 +31,16 @@ function getClient(apiKey: string, baseUrl?: string): OpenAI {
 
 export class OpenAIAdapter implements ModelProvider {
   private client: OpenAI;
+  reasoning: boolean;
 
   constructor(
     private apiKey: string,
     private modelName: string,
     private baseUrl: string,
-    private enableReasoning?: boolean
+    reasoning: boolean
   ) {
     this.client = getClient(apiKey, baseUrl);
+    this.reasoning = reasoning;
   }
 
   /**

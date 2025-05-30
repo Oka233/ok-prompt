@@ -347,7 +347,7 @@ export async function summarizeEvaluation({
           const { content } = filterContentByTag(answer, 'Summary');
           fullContent = content;
         }
-        onProgress(fullContent);
+        onProgress(fullContent.trim());
       },
       onUsage: (usage) => {
         tokenUsage = usage;
@@ -425,7 +425,8 @@ export async function optimizePrompt({
     userFeedback,
     historicalIterations,
     currentResults,
-    currentAvgScore
+    currentAvgScore,
+    model.reasoning
   );
   
   let fullContent = '';
@@ -459,7 +460,7 @@ export async function optimizePrompt({
           }
         }
         
-        onProgress(fullContent);
+        onProgress(fullContent.trim());
       },
       onUsage: (usage) => {
         tokenUsage = usage;

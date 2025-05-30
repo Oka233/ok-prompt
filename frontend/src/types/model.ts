@@ -30,6 +30,7 @@ export interface StreamCallbacks {
 }
 
 export interface ModelProvider {
+  reasoning: boolean;
   // 非流式调用
   generateCompletion(messages: ModelMessage[], options?: ModelOptions): Promise<ModelResponse>;
   

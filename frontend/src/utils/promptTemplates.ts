@@ -170,24 +170,17 @@ export function generateOptimizationPrompt(
     score: number | null,
     comment: string | null
   }>,
-  currentAvgScore?: number | null
+  currentAvgScore?: number | null,
+  reasoning?: boolean
 ): ModelMessage[] {
-  const messages: ModelMessage[] = [
-    {
-      role: 'system',
-      content: `
+  const systemMessage = `
 请基于以下信息，对原始提示词进行优化，生成一个新版本的提示词，旨在解决已发现的问题并提高整体表现。
 
-你的回复格式必须严格如下：
-<Thinking>
-你的思考过程
-</Thinking>
+你的回复格式必须严格如下：${reasoning ? '\n<Thinking>\n你的思考过程\n</Thinking>' : ''}
 <Prompt>
 优化后的新提示词内容
 </Prompt>
 `
-    }
-  ]
 
   let userMessage = '';
   
@@ -210,7 +203,8 @@ ${iter.summary}
 
 ${iter.userFeedback ? `用户反馈：\n${iter.userFeedback}` : ''}
 
----`
+---
+`
     } else {
       // 初始提示词结果
       userMessage += `
@@ -273,11 +267,13 @@ ${evaluationSummary}
 \`\`\`
 ${userFeedback ? `\n用户反馈：\n${userFeedback}` : ''}`;
 
+  console.log(systemMessage)
   console.log(userMessage)
-  messages.push({
-    role: 'user',
-    content: userMessage
-  });
 
-  return messages;
+  return reasoning ? [
+    { role: 'system', content: systemMessage },
+    { role: 'user', content: userMessage }
+  ] : [
+    { role: 'user', content: `${systemMessage}\n${userMessage}` }
+  ];
 } 

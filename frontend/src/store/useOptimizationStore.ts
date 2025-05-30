@@ -70,14 +70,13 @@ interface OptimizationState {
   models: ModelConfig[];
   
   // 任务管理
-  createTask: (name: string, testSet: TestSet, initialPrompt: string, maxIterations?: number, tokenBudget?: number, targetModelId?: string, optimizationModelId?: string, requireUserFeedback?: boolean, concurrentCalls?: number, isTargetModelReasoning?: boolean, isOptimizationModelReasoning?: boolean) => Promise<void>;
+  createTask: (name: string, testSet: TestSet, initialPrompt: string, maxIterations?: number, tokenBudget?: number, targetModelId?: string, optimizationModelId?: string, requireUserFeedback?: boolean, concurrentCalls?: number) => Promise<void>;
   loadTasks: () => Promise<void>;
   selectTask: (taskId: string) => void;
   deleteTask: (taskId: string) => Promise<void>;
   updateTaskModels: (taskId: string, targetModelId?: string, optimizationModelId?: string) => Promise<void>;
   updateTaskFeedbackSetting: (taskId: string, requireUserFeedback: boolean) => Promise<void>;
   updateTaskConcurrentCalls: (taskId: string, concurrentCalls: number) => Promise<void>;
-  updateTaskReasoningSettings: (taskId: string, isTargetModelReasoning: boolean, isOptimizationModelReasoning: boolean) => Promise<void>;
   
   // 视图控制
   setViewState: (state: ViewState) => void;
@@ -87,7 +86,7 @@ interface OptimizationState {
   stopOptimization: (taskId: string) => Promise<void>;
 
   // 模型管理
-  addModel: (name: string, displayName: string, apiKey: string, baseUrl: string, modelType: ModelType) => Promise<void>;
+  addModel: (name: string, displayName: string, apiKey: string, baseUrl: string, modelType: ModelType, reasoning: boolean) => Promise<void>;
   updateModel: (id: string, data: Partial<ModelConfig>) => Promise<void>;
   deleteModel: (id: string) => Promise<void>;
 
@@ -116,7 +115,7 @@ export const useOptimizationStore = create<OptimizationState>()(
       },
       
       // 任务管理
-      createTask: async (name, testSet, initialPrompt, maxIterations = 20, tokenBudget, targetModelId, optimizationModelId, requireUserFeedback = false, concurrentCalls = 3, isTargetModelReasoning = false, isOptimizationModelReasoning = false) => {
+      createTask: async (name, testSet, initialPrompt, maxIterations = 20, tokenBudget, targetModelId, optimizationModelId, requireUserFeedback = false, concurrentCalls = 3) => {
         set({ error: null });
         try {
           const initialTestCases: TestCaseResult[] = testSet.data.map((tc, index) => ({
@@ -160,9 +159,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             requireUserFeedback,
             concurrentCalls,
             testCases: initialTestCases,
-            promptIterations: [initialPromptIteration],
-            isTargetModelReasoning,
-            isOptimizationModelReasoning
+            promptIterations: [initialPromptIteration]
           };
           
           set(state => ({ 
@@ -244,8 +241,8 @@ export const useOptimizationStore = create<OptimizationState>()(
           }
 
           // 创建模型实例
-          const targetModelInstance = ModelFactory.createModel(targetModel, task.isTargetModelReasoning);
-          const optimizationModelInstance = ModelFactory.createModel(optimizationModel, task.isOptimizationModelReasoning);
+          const targetModelInstance = ModelFactory.createModel(targetModel);
+          const optimizationModelInstance = ModelFactory.createModel(optimizationModel);
 
           // 更新任务状态为进行中
           set(state => updateTask(state, taskId, () => ({ status: 'in_progress' as const })));
@@ -793,7 +790,7 @@ export const useOptimizationStore = create<OptimizationState>()(
       },
       
       // 模型管理
-      addModel: async (name, displayName, apiKey, baseUrl, modelType) => {
+      addModel: async (name, displayName, apiKey, baseUrl, modelType, reasoning = false) => {
         set({ error: null });
         try {
           const newModel: ModelConfig = {
@@ -803,6 +800,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             apiKey,
             baseUrl,
             modelType,
+            reasoning,
           };
           set(state => ({ 
             models: [...state.models, newModel],
@@ -828,19 +826,9 @@ export const useOptimizationStore = create<OptimizationState>()(
       deleteModel: async (id) => {
         set({ error: null });
         try {
-          set(state => {
-            const tasksUsingModel = state.tasks.filter(
-              task => task.targetModelId === id || task.optimizationModelId === id
-            );
-            if (tasksUsingModel.length > 0) {
-              // 构建使用该模型的任务名称列表
-              const taskNames = tasksUsingModel.map(task => `"${task.name}"`).join(', ');
-              throw new Error(`无法删除模型，以下${tasksUsingModel.length}个任务正在使用它: ${taskNames}`);
-            }
-            return {
-              models: state.models.filter(model => model.id !== id),
-            };
-          });
+          set(state => ({
+            models: state.models.filter(model => model.id !== id),
+          }));
         } catch (error) {
           set({ error: (error as Error).message });
           throw error; // 重新抛出错误，让UI层可以捕获
@@ -871,15 +859,6 @@ export const useOptimizationStore = create<OptimizationState>()(
           tasks: state.tasks.map(task => 
             task.id === taskId 
               ? { ...task, concurrentCalls }
-              : task
-          )
-        }));
-      },
-      updateTaskReasoningSettings: async (taskId, isTargetModelReasoning, isOptimizationModelReasoning) => {
-        set(state => ({
-          tasks: state.tasks.map(task => 
-            task.id === taskId 
-              ? { ...task, isTargetModelReasoning, isOptimizationModelReasoning }
               : task
           )
         }));

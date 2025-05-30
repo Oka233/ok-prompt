@@ -6,9 +6,9 @@ export class QwenAdapter extends OpenAIAdapter {
         apiKey: string,
         modelName: string,
         baseUrl: string,
-        enableReasoning: boolean
+        reasoning: boolean
     ) {
-        super(apiKey, modelName, baseUrl);
+        super(apiKey, modelName, baseUrl, reasoning);
     }
 
     async generateCompletion(

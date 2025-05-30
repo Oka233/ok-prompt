@@ -16,6 +16,7 @@ import {
   Dialog,
   Select,
   createListCollection,
+  Checkbox,
 } from '@chakra-ui/react'
 import { Table } from '@chakra-ui/react'
 import { toaster } from "@/components/ui/toaster"
@@ -43,7 +44,7 @@ export enum ProviderType {
 const providers = {
   [ProviderType.DASHSCOPE]: {
     value: ProviderType.DASHSCOPE,
-    title: '百炼',
+    title: '阿里云百炼',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1'
   },
   [ProviderType.OPENROUTER]: {
@@ -123,6 +124,8 @@ export function ModelManagement() {
   const [error, setError] = useState<string | null>(null)
   // 添加状态变量跟踪用户是否手动编辑过展示名称
   const [isDisplayNameEdited, setIsDisplayNameEdited] = useState(false)
+  // 添加推理模型状态
+  const [isReasoning, setIsReasoning] = useState(false)
   
   // 删除确认对话框状态
   const [deleteModelId, setDeleteModelId] = useState<string | null>(null)
@@ -177,6 +180,7 @@ export function ModelManagement() {
     setSelectedProvider(modelTypeOptions[0].providerOptions[0]?.value || '')
     setError(null)
     setIsDisplayNameEdited(false)
+    setIsReasoning(false)
     onOpen()
   }
   
@@ -188,6 +192,7 @@ export function ModelManagement() {
     setApiKey(model.apiKey)
     setBaseUrl(model.baseUrl)
     setSelectedModelType(model.modelType)
+    setIsReasoning(model.reasoning || false)
     
     // 尝试从baseUrl找到匹配的供应商
     const modelTypeConfig = modelTypeOptions.find(opt => opt.value === model.modelType);
@@ -295,7 +300,8 @@ export function ModelManagement() {
           displayName,
           apiKey,
           baseUrl: finalBaseUrl,
-          modelType: selectedModelType
+          modelType: selectedModelType,
+          reasoning: isReasoning
         })
         toaster.create({
           title: "更新成功",
@@ -303,7 +309,7 @@ export function ModelManagement() {
           type: "success",
         })
       } else {
-        await addModel(modelName, displayName, apiKey, finalBaseUrl, selectedModelType)
+        await addModel(modelName, displayName, apiKey, finalBaseUrl, selectedModelType, isReasoning)
         toaster.create({
           title: "添加成功",
           description: "模型已成功添加",
@@ -474,6 +480,7 @@ export function ModelManagement() {
                     <Flex gap={2}>
                       <IconButton
                         aria-label="编辑"
+                        variant="ghost"
                         onClick={() => handleEditModel(model)}
                         size="sm"
                       >
@@ -482,6 +489,8 @@ export function ModelManagement() {
                       <IconButton
                         aria-label="删除"
                         size="sm"
+                        variant="ghost"
+                        colorPalette="red"
                         onClick={() => openDeleteConfirm(model.id)}
                       >
                         <FiTrash2 />
@@ -508,9 +517,6 @@ export function ModelManagement() {
               <Dialog.Body>
                 <Text mb={2}>
                   确定要删除模型 "{models.find(m => m.id === deleteModelId)?.name}" 吗？
-                </Text>
-                <Text fontSize="sm" color="gray.500">
-                  如果有任务正在使用此模型，将无法删除。
                 </Text>
               </Dialog.Body>
               
@@ -619,6 +625,22 @@ export function ModelManagement() {
                         value={modelName}
                         onChange={handleModelNameChange}
                       />
+                    </Box>
+
+                    <Box mb={4}>
+                      <Checkbox.Root
+                        checked={isReasoning}
+                        onCheckedChange={(details) => {
+                          setIsReasoning(!!details.checked);
+                        }}
+                      >
+                        <Checkbox.HiddenInput />
+                        <Checkbox.Control />
+                        <Checkbox.Label>推理模型</Checkbox.Label>
+                      </Checkbox.Root>
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        勾选推理模型/为混合模型启用推理
+                      </Text>
                     </Box>
 
                     <Box mb={4}>

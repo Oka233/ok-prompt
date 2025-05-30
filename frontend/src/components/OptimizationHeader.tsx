@@ -30,7 +30,7 @@ interface ModelOption {
 export function OptimizationHeader() {
   const direction = useBreakpointValue({ base: 'column', md: 'row' }) || 'column';
   const isMobile = direction === 'column';
-  const { deleteTask, models, tasks, updateTaskModels, startOptimization, stopOptimization, updateTaskFeedbackSetting, updateTaskReasoningSettings, currentTaskId } = useOptimizationStore();
+  const { deleteTask, models, tasks, updateTaskModels, startOptimization, stopOptimization, updateTaskFeedbackSetting, currentTaskId } = useOptimizationStore();
   const { open, onOpen, onClose } = useDisclosure();
   
   // 删除确认对话框状态
@@ -48,17 +48,13 @@ export function OptimizationHeader() {
   const [selectedTargetModel, setSelectedTargetModel] = useState<string | undefined>(currentTask.targetModelId);
   const [selectedOptimizationModel, setSelectedOptimizationModel] = useState<string | undefined>(currentTask.optimizationModelId);
   const [requireUserFeedback, setRequireUserFeedback] = useState(currentTask.requireUserFeedback || false);
-  const [isTargetModelReasoning, setIsTargetModelReasoning] = useState(currentTask.isTargetModelReasoning || false);
-  const [isOptimizationModelReasoning, setIsOptimizationModelReasoning] = useState(currentTask.isOptimizationModelReasoning || false);
 
   useEffect(() => {
     // 移除不必要的检查
     setSelectedTargetModel(currentTask.targetModelId);
     setSelectedOptimizationModel(currentTask.optimizationModelId);
     setRequireUserFeedback(currentTask.requireUserFeedback || false);
-    setIsTargetModelReasoning(currentTask.isTargetModelReasoning || false);
-    setIsOptimizationModelReasoning(currentTask.isOptimizationModelReasoning || false);
-  }, [currentTask?.targetModelId, currentTask?.optimizationModelId, currentTask?.requireUserFeedback, currentTask?.isTargetModelReasoning, currentTask?.isOptimizationModelReasoning, taskId]);
+  }, [currentTask?.targetModelId, currentTask?.optimizationModelId, currentTask?.requireUserFeedback, taskId]);
 
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -81,9 +77,6 @@ export function OptimizationHeader() {
     // 更新用户反馈设置
     await updateTaskFeedbackSetting(taskId, requireUserFeedback);
     
-    // 更新推理模型设置
-    await updateTaskReasoningSettings(taskId, isTargetModelReasoning, isOptimizationModelReasoning);
-    
     onClose();
   };
 
@@ -92,8 +85,6 @@ export function OptimizationHeader() {
     setSelectedTargetModel(currentTask.targetModelId);
     setSelectedOptimizationModel(currentTask.optimizationModelId);
     setRequireUserFeedback(currentTask.requireUserFeedback || false);
-    setIsTargetModelReasoning(currentTask.isTargetModelReasoning || false);
-    setIsOptimizationModelReasoning(currentTask.isOptimizationModelReasoning || false);
     onClose();
   };
 
@@ -196,6 +187,7 @@ export function OptimizationHeader() {
             <IconButton
               variant="outline"
               size="sm"
+              colorPalette="red"
               onClick={onDeleteOpen}
             >
               <FiTrash2 />
@@ -260,19 +252,6 @@ export function OptimizationHeader() {
                   </Box>
                   
                   <Box>
-                    <Checkbox.Root
-                      checked={isTargetModelReasoning}
-                      onCheckedChange={(details) => {
-                        setIsTargetModelReasoning(!!details.checked);
-                      }}
-                    >
-                      <Checkbox.HiddenInput />
-                      <Checkbox.Control />
-                      <Checkbox.Label>推理模型</Checkbox.Label>
-                    </Checkbox.Root>
-                  </Box>
-                  
-                  <Box>
                     <Text mb={1} fontSize="sm" fontWeight="medium">优化模型</Text>
                     <Select.Root
                       collection={modelOptionsCollection}
@@ -302,19 +281,6 @@ export function OptimizationHeader() {
                         </Select.Positioner>
                       </Portal>
                     </Select.Root>
-                  </Box>
-                  
-                  <Box>
-                    <Checkbox.Root
-                      checked={isOptimizationModelReasoning}
-                      onCheckedChange={(details) => {
-                        setIsOptimizationModelReasoning(!!details.checked);
-                      }}
-                    >
-                      <Checkbox.HiddenInput />
-                      <Checkbox.Control />
-                      <Checkbox.Label>推理模型</Checkbox.Label>
-                    </Checkbox.Root>
                   </Box>
                   
                   <Box>

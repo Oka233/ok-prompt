@@ -5,7 +5,7 @@ import { QwenAdapter } from './qwen-adapter';
 import { ModelConfig, ModelType } from '@/types/optimization';
 
 export class ModelFactory {
-  static createModel(config: ModelConfig, isReasoning: boolean = false): ModelProvider {
+  static createModel(config: ModelConfig): ModelProvider {
     // 根据模型类型创建不同的适配器
     switch (config.modelType) {
       case ModelType.OPENAI:
@@ -15,12 +15,12 @@ export class ModelFactory {
           config.apiKey,
           config.name,
           config.baseUrl,
-          isReasoning
+          config.reasoning
         );
       case ModelType.GEMINI:
-        return new GoogleAdapter(config.apiKey, config.name, config.baseUrl);
+        return new GoogleAdapter(config.apiKey, config.name, config.baseUrl, config.reasoning);
       case ModelType.QWEN:
-        return new QwenAdapter(config.apiKey, config.name, config.baseUrl, isReasoning);
+        return new QwenAdapter(config.apiKey, config.name, config.baseUrl, config.reasoning);
       default:
         throw new Error(`不支持的模型类型: ${config.modelType}`);
     }
