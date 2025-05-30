@@ -871,6 +871,7 @@ export const useOptimizationStore = create<OptimizationState>()(
             userFeedback: feedback,
             waitingForFeedback: false
           })));
+          get().startOptimization(taskId);
         } catch (error) {
           set({ error: (error as Error).message });
           throw error;

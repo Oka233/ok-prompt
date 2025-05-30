@@ -6,10 +6,12 @@ import {
   Flex,
   Badge,
   Spinner,
-  Textarea
+  Textarea,
+  IconButton
 } from '@chakra-ui/react'
 import { useState } from 'react'
 import { BiChevronDown } from 'react-icons/bi'
+import { FiCheck } from 'react-icons/fi'
 import { useCurrentPromptIterations } from '@/store/useOptimizationStore'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 import { toaster } from "@/components/ui/toaster"
@@ -18,7 +20,6 @@ export function PromptIterationList() {
   const currentPromptIterations = useCurrentPromptIterations()
   const currentTask = useOptimizationStore(state => state.tasks.find(t => t.id === state.currentTaskId))
   const { submitUserFeedback, tasks, currentTaskId, closeSummary, showSummary } = useOptimizationStore()
-  const [selectedIteration, setSelectedIteration] = useState<string | null>('0')
   const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({})
   
   const toggleReport = (id: string) => {
@@ -36,10 +37,6 @@ export function PromptIterationList() {
     }
   }
 
-  const handleSelectIteration = (id: string) => {
-    setSelectedIteration(id)
-  }
-
   const handleFeedbackChange = (iterationId: string, value: string) => {
     setFeedbackInputs(prev => ({
       ...prev,
@@ -49,21 +46,8 @@ export function PromptIterationList() {
 
   const handleSubmitFeedback = async (iterationId: string) => {
     const feedback = feedbackInputs[iterationId]
-    if (!feedback?.trim()) {
-      toaster.create({
-        title: "提交失败",
-        description: "请输入反馈内容",
-        type: "error",
-      })
-      return
-    }
     try {
       await submitUserFeedback(currentTask?.id || '', iterationId, feedback)
-      toaster.create({
-        title: "提交成功",
-        description: "反馈已成功提交",
-        type: "success",
-      })
     } catch (error) {
       toaster.create({
         title: "提交失败",
@@ -135,22 +119,18 @@ export function PromptIterationList() {
       </Heading>
 
       <Box>
-        {currentPromptIterations.map((item) => (
+        {currentPromptIterations.map((item, index) => (
           <Box 
             key={item.id}
             borderWidth="1px"
-            borderColor={item.id === selectedIteration ? "blue.500" : "gray.200"}
             borderRadius="lg"
             p={4}
-            bg={item.id === selectedIteration ? "blue.50" : "white"}
             mb={3}
-            cursor="pointer"
             _hover={{ shadow: "md" }}
             transition="150ms ease-in-out"
-            onClick={() => handleSelectIteration(item.id)}
           >
             <Flex alignItems="center">
-              <Text fontWeight="semibold" color={item.id === selectedIteration ? "blue.700" : "gray.700"}>
+              <Text fontWeight="semibold" color={"gray.700"}>
                 {item.iteration === 0 ? `初始提示词` : `优化提示词`} - 迭代 {item.iteration}
               </Text>
               {getStageBadge(item)}
@@ -176,7 +156,7 @@ export function PromptIterationList() {
                 }}
               >
                 <Flex alignItems="center">
-                  查看评估总结报告
+                  查看用例评估总结
                   <BiChevronDown 
                     size={16}
                     style={{
@@ -189,36 +169,36 @@ export function PromptIterationList() {
               </Button>
               
               {item.showReport && (
-                <Box mt={2} p={2} bg="gray.50" borderRadius="md" fontSize="xs" color="gray.600">
+                <Box mt={2} p={2} bg="gray.100" borderRadius="md" fontSize="xs" color="gray.600">
                   {item.reportSummary}
                 </Box>
               )}
 
               {/* 用户反馈区域 */}
               { (item?.userFeedback || (item.waitingForFeedback && item.stage) === 'summarized') && (
-                    <Box mt={3}>
-                      <Text fontSize="xs" fontWeight="medium" mb={1}>用户反馈：</Text>
-                      <Textarea
-                        value={item.userFeedback || feedbackInputs[item.id] || ''}
-                        onChange={(e) => handleFeedbackChange(item.id, e.target.value)}
-                        placeholder="请输入您的反馈..."
-                        size="sm"
-                        disabled={!!item.userFeedback}
-                      />
-                      {!item.userFeedback && (
-                        <Button
-                          size="sm"
-                          colorScheme="blue"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleSubmitFeedback(item.id)
-                          }}
-                        >
-                          提交反馈
-                        </Button>
-                      )}
-                    </Box>
+                <Flex alignItems="end" gap={2} mt={2}>
+                  <Textarea
+                    value={item.userFeedback || feedbackInputs[item.id] || ''}
+                    onChange={(e) => handleFeedbackChange(item.id, e.target.value)}
+                    placeholder="请输入您的意见"
+                    size="sm"
+                    disabled={index !== currentPromptIterations.length - 1}
+                  />
+                  {index === currentPromptIterations.length - 1 && (
+                    <IconButton
+                      size="sm"
+                      variant="outline"
+                      colorPalette="blue"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSubmitFeedback(item.id)
+                      }}
+                    >
+                      <FiCheck />
+                    </IconButton>
                   )}
+                </Flex>
+              )}
             </Box>
           </Box>
         ))}
