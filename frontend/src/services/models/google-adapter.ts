@@ -50,6 +50,23 @@ export class GoogleAdapter implements ModelProvider {
   }
 
   /**
+   * 适配参数格式，将通用参数格式转换为Google所需的格式
+   */
+  protected adaptOptions(options?: ModelOptions): ModelOptions {
+    if (!options) return {};
+    
+    const adaptedOptions = { ...options };
+    
+    // 将maxTokens转换为maxOutputTokens
+    if (options.maxTokens !== undefined) {
+      adaptedOptions.maxOutputTokens = options.maxTokens;
+      delete adaptedOptions.maxTokens;
+    }
+    
+    return adaptedOptions;
+  }
+
+  /**
    * 将ModelMessage转换为Gemini兼容的格式
    */
   private convertMessages(messages: ModelMessage[]) {
@@ -75,6 +92,9 @@ export class GoogleAdapter implements ModelProvider {
     try {
       const { geminiContents, systemInstruction } = this.convertMessages(messages);
       
+      // 适配参数格式
+      const adaptedOptions = this.adaptOptions(options);
+      
       // 发送请求
       const response = await this.client.models.generateContent({
         model: this.modelName,
@@ -85,7 +105,7 @@ export class GoogleAdapter implements ModelProvider {
             includeThoughts: true,
             thinkingBudget: 0, // 非流式调用时，思考预算设置为0
           },
-          ...options,
+          ...adaptedOptions,
         },
       });
       
@@ -128,6 +148,9 @@ export class GoogleAdapter implements ModelProvider {
     try {
       const { geminiContents, systemInstruction } = this.convertMessages(messages);
       
+      // 适配参数格式
+      const adaptedOptions = this.adaptOptions(options);
+      
       // 创建流式响应
       const stream = await this.client.models.generateContentStream({
         model: this.modelName,
@@ -137,7 +160,7 @@ export class GoogleAdapter implements ModelProvider {
           thinkingConfig: {
             includeThoughts: true,
           },
-          ...options,
+          ...adaptedOptions,
         },
       });
       

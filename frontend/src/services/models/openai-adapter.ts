@@ -44,14 +44,40 @@ export class OpenAIAdapter implements ModelProvider {
   }
 
   /**
+   * 适配参数格式，将通用参数格式转换为OpenAI所需的格式
+   */
+  protected adaptOptions(options?: ModelOptions): ModelOptions {
+    if (!options) return {};
+    
+    const adaptedOptions = { ...options };
+    
+    // 将topP转换为top_p
+    if (options.topP !== undefined) {
+      adaptedOptions.top_p = options.topP;
+      delete adaptedOptions.topP;
+    }
+    
+    // 将maxTokens转换为max_tokens
+    if (options.maxTokens !== undefined) {
+      adaptedOptions.max_tokens = options.maxTokens;
+      delete adaptedOptions.maxTokens;
+    }
+    
+    return adaptedOptions;
+  }
+
+  /**
    * 非流式生成完成
    */
   async generateCompletion(messages: ModelMessage[], options?: ModelOptions): Promise<ModelResponse> {
     try {
+      // 适配参数格式
+      const adaptedOptions = this.adaptOptions(options);
+      
       const response = await this.client.chat.completions.create({
         model: this.modelName,
         messages: messages as any,
-        ...options
+        ...adaptedOptions
       });
       
       // 提取使用的token信息
@@ -86,12 +112,15 @@ export class OpenAIAdapter implements ModelProvider {
     options?: ModelOptions
   ): Promise<void> {
     try {
+      // 适配参数格式
+      const adaptedOptions = this.adaptOptions(options);
+      
       const stream = await this.client.chat.completions.create({
         model: this.modelName,
         messages: messages as any,
         stream: true,
         stream_options: { include_usage: true },
-        ...options
+        ...adaptedOptions
       });
       
       let fullContent = '';

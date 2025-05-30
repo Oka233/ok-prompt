@@ -64,6 +64,7 @@ export async function executeTests({
   isCancelled,
   concurrentLimit = 3,
   onSingleTestComplete,
+  modelOptions = {}
 }: {
   prompt: string;
   testCases: TestCase[];
@@ -71,6 +72,12 @@ export async function executeTests({
   isCancelled?: () => boolean; // 用于检查任务是否被取消
   concurrentLimit?: number; // 并发限制
   onSingleTestComplete?: (result: TestResult, index: number) => void; // 单个测试完成的回调
+  modelOptions?: {
+    temperature?: number;
+    topP?: number;
+    maxTokens?: number;
+    [key: string]: any;
+  }; // 模型参数
 }): Promise<TestResult[]> {
   const results: TestResult[] = new Array(testCases.length);
   
@@ -88,8 +95,8 @@ export async function executeTests({
       { role: 'user', content: testCase.input }
     ];
     
-    // 直接调用目标LLM，让错误向上传播
-    const response = await model.generateCompletion(messages);
+    // 直接调用目标LLM，让错误向上传播，传入模型参数
+    const response = await model.generateCompletion(messages, { ...modelOptions });
     
     const actualOutput = response.answer;
     

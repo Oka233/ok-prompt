@@ -77,6 +77,7 @@ interface OptimizationState {
   updateTaskModels: (taskId: string, targetModelId?: string, optimizationModelId?: string) => Promise<void>;
   updateTaskFeedbackSetting: (taskId: string, requireUserFeedback: boolean) => Promise<void>;
   updateTaskConcurrentCalls: (taskId: string, concurrentCalls: number) => Promise<void>;
+  updateTaskTestConfig: (taskId: string, testConfig: { temperature: number; topP: number; maxTokens: number; enableTemperature: boolean; enableTopP: boolean; enableMaxTokens: boolean }) => Promise<void>;
   
   // 视图控制
   setViewState: (state: ViewState) => void;
@@ -159,7 +160,15 @@ export const useOptimizationStore = create<OptimizationState>()(
             requireUserFeedback,
             concurrentCalls,
             testCases: initialTestCases,
-            promptIterations: [initialPromptIteration]
+            promptIterations: [initialPromptIteration],
+            testConfig: {
+              temperature: 0.7,
+              topP: 1.0,
+              maxTokens: 2048,
+              enableTemperature: false,
+              enableTopP: false,
+              enableMaxTokens: false
+            }
           };
           
           set(state => ({ 
@@ -487,9 +496,12 @@ export const useOptimizationStore = create<OptimizationState>()(
                     isCancelled: () => isTaskPaused(get(), taskId),
                     concurrentLimit: task.concurrentCalls,
                     onSingleTestComplete: mappedHandleSingleTestComplete,
+                    modelOptions: {
+                      ...(task.testConfig.enableTemperature && { temperature: task.testConfig.temperature }),
+                      ...(task.testConfig.enableTopP && { topP: task.testConfig.topP }),
+                      ...(task.testConfig.enableMaxTokens && { maxTokens: task.testConfig.maxTokens }),
+                    },
                   });
-                } else {
-                  
                 }
 
                 // 确保所有测试用例都有结果
@@ -859,6 +871,22 @@ export const useOptimizationStore = create<OptimizationState>()(
           tasks: state.tasks.map(task => 
             task.id === taskId 
               ? { ...task, concurrentCalls }
+              : task
+          )
+        }));
+      },
+      updateTaskTestConfig: async (taskId, testConfig) => {
+        set(state => ({
+          tasks: state.tasks.map(task => 
+            task.id === taskId 
+              ? { ...task, testConfig: {
+                  temperature: testConfig.temperature,
+                  topP: testConfig.topP,
+                  maxTokens: testConfig.maxTokens,
+                  enableTemperature: testConfig.enableTemperature,
+                  enableTopP: testConfig.enableTopP,
+                  enableMaxTokens: testConfig.enableMaxTokens
+                } }
               : task
           )
         }));
