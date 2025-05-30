@@ -6,7 +6,7 @@ import {
 import { TestCase, TestMode } from '@/types/optimization';
 import { ModelProvider, ModelMessage } from '@/types/model';
 import { OperationCancelledError } from '@/errors/OperationCancelledError';
-import { filterContentByTag } from '@/utils/streamingUtils';
+import { filterContentByTag, createThrottledStreamGenerator } from '@/utils/streamingUtils';
 
 export interface InputTestResult {
   input: string;
@@ -336,13 +336,15 @@ export async function summarizeEvaluation({
     totalTokens: 0
   };
   
-  // 使用流式API
-  await model.generateCompletionStream(
+  // 使用节流后的流式API
+  const throttledGenerateStream = createThrottledStreamGenerator(model.generateCompletionStream.bind(model), 200);
+  
+  await throttledGenerateStream(
     messages,
     {
       onContent: (thought, answer) => {
         if (!answer) {
-          fullContent = `<思考中> ${thought}`;
+          fullContent = `<思考中> ${thought || '...'}`;
         } else {
           const { content } = filterContentByTag(answer, 'Summary');
           fullContent = content;
@@ -436,14 +438,16 @@ export async function optimizePrompt({
     totalTokens: 0
   };
   
-  // 使用流式API
-  await model.generateCompletionStream(
+  // 使用节流后的流式API
+  const throttledGenerateStream = createThrottledStreamGenerator(model.generateCompletionStream.bind(model), 200);
+  
+  await throttledGenerateStream(
     messages,
     {
       onContent: (thought, answer) => {
+        const { closed: isPromptClosed, content: promptContent } = filterContentByTag(answer, 'Prompt');
         if (thought) {
           // 推理模型，返回thought
-          const { closed: isPromptClosed, content: promptContent } = filterContentByTag(answer, 'Prompt');
           if (!answer) {
             fullContent = `<思考中> \n${thought}`;
           } else {
@@ -452,7 +456,6 @@ export async function optimizePrompt({
         } else {
           // 非推理模型，从thinking标签提取思考内容
           const { closed: isThinkingClosed, content: thinkingContent } = filterContentByTag(answer, 'Thinking');
-          const { closed: isPromptClosed, content: promptContent } = filterContentByTag(answer, 'Prompt');
           if (!isThinkingClosed && !isPromptClosed) {
             fullContent = `<思考中> \n${thinkingContent}`;
           } else {

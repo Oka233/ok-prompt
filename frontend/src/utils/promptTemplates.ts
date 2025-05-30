@@ -176,7 +176,7 @@ export function generateOptimizationPrompt(
   const systemMessage = `
 请基于以下信息，对原始提示词进行优化，生成一个新版本的提示词，旨在解决已发现的问题并提高整体表现。
 
-你的回复格式必须严格如下：${reasoning ? '\n<Thinking>\n你的思考过程\n</Thinking>' : ''}
+你的回复格式必须严格如下：${reasoning ? '' : '\n<Thinking>\n你的思考过程\n</Thinking>'}
 <Prompt>
 优化后的新提示词内容
 </Prompt>
