@@ -11,7 +11,8 @@ import {
   Input,
   Textarea,
   IconButton,
-  Checkbox
+  Checkbox,
+  Field
 } from '@chakra-ui/react'
 import { FiUploadCloud, FiPlus, FiTrash2, FiLayers } from 'react-icons/fi'
 import { useState, useMemo, useEffect } from 'react'
@@ -45,13 +46,23 @@ const createModelListCollection = (models: ModelConfig[]) => {
   });
 };
 
+// 添加错误类型定义
+interface FormErrors {
+  taskName?: string;
+  initialPrompt?: string;
+  testCases?: string;
+  general?: string; // 用于通用错误
+}
+
 export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
   const [taskName, setTaskName] = useState('');
   const [initialPrompt, setInitialPrompt] = useState('');
   const [testMode, setTestMode] = useState('strict');
   const [testCases, setTestCases] = useState<TestCase[]>([{ input: '', expectedOutput: '' }]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  
+  // 将单一错误字符串改为错误对象
+  const [errors, setErrors] = useState<FormErrors>({});
   
   const { createTask, models } = useOptimizationStore();
   const [targetModelId, setTargetModelId] = useState<string | undefined>(undefined);
@@ -67,25 +78,45 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
     }
   }, [models]);
 
+  // 验证表单函数
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+    let isValid = true;
+    
+    // 验证任务名称
+    if (!taskName.trim()) {
+      newErrors.taskName = '请输入任务名称';
+      isValid = false;
+    }
+    
+    // 验证初始提示词
+    if (!initialPrompt.trim()) {
+      newErrors.initialPrompt = '请输入初始提示词';
+      isValid = false;
+    }
+    
+    // 验证测试用例
+    const validTestCases = testCases.filter(tc => tc.input.trim() || tc.expectedOutput.trim());
+    if (validTestCases.length === 0) {
+      newErrors.testCases = '请至少添加一个有效的测试用例（输入或输出至少一项不为空）';
+      isValid = false;
+    }
+    
+    setErrors(newErrors);
+    return isValid;
+  };
+
   const handleCreateTask = async () => {
-    setError(null);
+    // 清空之前的错误
+    setErrors({});
+    
+    // 验证表单
+    if (!validateForm()) {
+      return;
+    }
     
     try {
-      if (!taskName.trim()) {
-        setError('请输入任务名称');
-        return;
-      }
-      
-      if (!initialPrompt.trim()) {
-        setError('请输入初始提示词');
-        return;
-      }
-      
       const validTestCases = testCases.filter(tc => tc.input.trim() || tc.expectedOutput.trim());
-      if (validTestCases.length === 0) {
-        setError('请至少添加一个有效的测试用例（输入或输出至少一项不为空）');
-        return;
-      }
       
       await createTask(
         taskName,
@@ -108,13 +139,17 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
       onUpload();
     } catch (err) {
       console.error('创建任务失败:', err);
-      setError(err instanceof Error ? err.message : '创建任务失败');
+      setErrors({
+        general: err instanceof Error ? err.message : '创建任务失败'
+      });
     }
   };
   
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
+    // 清空错误状态
+    setErrors({});
     setSelectedFile(null);
+    
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setSelectedFile(file);
@@ -124,14 +159,18 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
         const jsonData = JSON.parse(content);
         
         if (!Array.isArray(jsonData)) {
-          setError('JSON 文件内容必须是一个测试用例数组。例如：[{"input": "...", "output": "..."}, ...]');
+          setErrors({ 
+            testCases: 'JSON 文件内容必须是一个测试用例数组。例如：[{"input": "...", "output": "..."}, ...]' 
+          });
           if (e.target) e.target.value = ''; // Clear file input
           setSelectedFile(null);
           return;
         }
         
         if (jsonData.length === 0) {
-          setError('JSON 文件中没有测试用例。');
+          setErrors({ 
+            testCases: 'JSON 文件中没有测试用例。'
+          });
           if (e.target) e.target.value = ''; // Clear file input
           setSelectedFile(null);
           return;
@@ -154,7 +193,9 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
 
       } catch (err) {
         console.error('解析文件失败:', err);
-        setError(err instanceof Error ? err.message : '文件格式无效或内容错误，请上传有效的 JSON 测试用例数组。');
+        setErrors({
+          testCases: err instanceof Error ? err.message : '文件格式无效或内容错误，请上传有效的 JSON 测试用例数组。'
+        });
         if (e.target) e.target.value = ''; // Clear file input
         setSelectedFile(null);
       }
@@ -200,34 +241,34 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
       <Text fontSize="xl" fontWeight="bold" mb={6}>创建新的优化任务</Text>
       
       <Box w="100%" maxW="800px" bg="white" borderRadius="lg" shadow="md" p={6}>
-        {error && (
-          <Box bg="red.50" color="red.600" p={3} borderRadius="md" mb={4}>
-            <Text>{error}</Text>
-          </Box>
-        )}
-        
         <VStack align="stretch" gap={6}>
-            <Box>
-              <Text mb={2} fontWeight="medium">任务名称</Text>
+            <Field.Root invalid={!!errors.taskName}>
+              <Field.Label fontWeight="medium">任务名称</Field.Label>
               <Input 
                 placeholder="例如：产品描述提取优化" 
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
               />
-            </Box>
+              {errors.taskName && (
+                <Field.ErrorText>{errors.taskName}</Field.ErrorText>
+              )}
+            </Field.Root>
             
-            <Box>
-              <Text mb={2} fontWeight="medium">初始提示词</Text>
+            <Field.Root invalid={!!errors.initialPrompt}>
+              <Field.Label fontWeight="medium">初始提示词</Field.Label>
               <Textarea 
                 placeholder="输入初始提示词..." 
                 rows={4}
                 value={initialPrompt}
                 onChange={(e) => setInitialPrompt(e.target.value)}
               />
-            </Box>
+              {errors.initialPrompt && (
+                <Field.ErrorText>{errors.initialPrompt}</Field.ErrorText>
+              )}
+            </Field.Root>
             
-            <Box>
-              <Text mb={2} fontWeight="medium">测试模式</Text>
+            <Field.Root>
+              <Field.Label fontWeight="medium">测试模式</Field.Label>
               <Select.Root 
                 collection={testModeOptions} 
                 size="sm" 
@@ -262,20 +303,13 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                   </Select.Positioner>
                 </Portal>
               </Select.Root>
-              <Box>
-                <Text fontSize="sm" color="gray.500" mt={2}>
-                  严格模式下，要求模型输出与用例输出严格匹配；描述性模式下，用例输出是对模型输出的描述，由模型打分符合程度
-                </Text>
-              </Box>
-              <Box mt={1}>
-                <Text fontSize="sm" color="gray.500">
-                  
-                </Text>
-              </Box>
-            </Box>
+              <Field.HelperText fontSize="xs" color="gray.500">
+                严格模式下，要求模型输出与用例输出严格匹配；描述性模式下，用例输出是对模型输出的描述，由模型打分符合程度
+              </Field.HelperText>
+            </Field.Root>
 
-            <Box>
-              <Text mb={2} fontWeight="medium">目标模型</Text>
+            <Field.Root>
+              <Field.Label fontWeight="medium">目标模型</Field.Label>
               <Select.Root 
                 collection={modelOptions} 
                 size="sm" 
@@ -312,10 +346,10 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                   </Select.Positioner>
                 </Portal>
               </Select.Root>
-            </Box>
+            </Field.Root>
 
-            <Box>
-              <Text mb={2} fontWeight="medium">优化模型</Text>
+            <Field.Root>
+              <Field.Label fontWeight="medium">优化模型</Field.Label>
               <Select.Root 
                 collection={modelOptions} 
                 size="sm" 
@@ -352,9 +386,9 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                   </Select.Positioner>
                 </Portal>
               </Select.Root>
-            </Box>
+            </Field.Root>
 
-            <Box>
+            <Field.Root>
               <Checkbox.Root
                 defaultChecked={false}
                 onCheckedChange={(details) => {
@@ -365,39 +399,43 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                 <Checkbox.Control />
                 <Checkbox.Label>需要用户反馈</Checkbox.Label>
               </Checkbox.Root>
-              <Text fontSize="sm" color="gray.500" mt={1}>
+              <Field.HelperText fontSize="xs" color="gray.500">
                 启用此选项后，每个优化迭代都需要用户确认才能继续
-              </Text>
-            </Box>
+              </Field.HelperText>
+            </Field.Root>
             
-            <Box>
-                <Text mb={2} fontWeight="medium">测试用例数据集</Text>
-                <Text fontSize="sm" color="gray.500" mb={2}>
-                  {"上传JSON文件批量导入测试用例。格式: [{\"input\": \"输入1\", \"output\": \"期望输出1\"}, ...]"}
+            <Field.Root invalid={!!errors.testCases}>
+              <Field.Label fontWeight="medium">测试用例数据集</Field.Label>
+              <Field.HelperText fontSize="xs" color="gray.500" mb={2}>
+                {"上传JSON文件批量导入测试用例。格式: [{\"input\": \"输入1\", \"output\": \"期望输出1\"}, ...]"}
+              </Field.HelperText>
+              <Box 
+                border="2px dashed" 
+                borderColor="gray.200" 
+                borderRadius="md" 
+                p={6}
+                w="100%"
+                textAlign="center"
+                cursor="pointer"
+                _hover={{ borderColor: "gray.300" }}
+                onClick={() => document.getElementById('testcase-file-upload')?.click()}
+              >
+                <input
+                  id="testcase-file-upload"
+                  type="file"
+                  accept=".json"
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
+                <Icon as={FiUploadCloud} w={8} h={8} color="gray.400" mb={2} />
+                <Text color="gray.500" fontSize="sm">
+                  {selectedFile ? `已选择: ${selectedFile.name}` : '点击上传测试用例文件'}
                 </Text>
-                <Box 
-                  border="2px dashed" 
-                  borderColor="gray.200" 
-                  borderRadius="md" 
-                  p={6}
-                  textAlign="center"
-                  cursor="pointer"
-                  _hover={{ borderColor: "gray.300" }}
-                  onClick={() => document.getElementById('testcase-file-upload')?.click()}
-                >
-                  <input
-                    id="testcase-file-upload"
-                    type="file"
-                    accept=".json"
-                    style={{ display: 'none' }}
-                    onChange={handleFileChange}
-                  />
-                  <Icon as={FiUploadCloud} w={8} h={8} color="gray.400" mb={2} />
-                  <Text color="gray.500" fontSize="sm">
-                    {selectedFile ? `已选择: ${selectedFile.name}` : '点击上传测试用例文件'}
-                  </Text>
-                </Box>
-            </Box>
+              </Box>
+              {errors.testCases && (
+                <Field.ErrorText>{errors.testCases}</Field.ErrorText>
+              )}
+            </Field.Root>
 
             <Box>
               <Flex justifyContent="space-between" alignItems="center" mb={3}>
@@ -408,7 +446,7 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                 >
                   <Flex alignItems="center" gap={2}>
                     <FiPlus />
-                    <Text>添加用例</Text>
+                    <Text>手动添加用例</Text>
                   </Flex>
                 </Button>
               </Flex>
@@ -435,8 +473,8 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                         <FiTrash2 />
                       </IconButton>
                     </Flex>
-                    <Box mb={3}>
-                      <Text fontSize="sm" mb={1}>输入</Text>
+                    <Field.Root mb={3}>
+                      <Field.Label fontSize="sm">输入</Field.Label>
                       <Textarea 
                         placeholder="输入文本..." 
                         size="sm"
@@ -444,9 +482,9 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                         value={testCase.input}
                         onChange={(e) => updateTestCase(index, 'input', e.target.value)}
                       />
-                    </Box>
-                    <Box>
-                      <Text fontSize="sm" mb={1}>期望输出</Text>
+                    </Field.Root>
+                    <Field.Root>
+                      <Field.Label fontSize="sm">期望输出</Field.Label>
                       <Textarea 
                         placeholder="期望输出..." 
                         size="sm"
@@ -454,11 +492,18 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
                         value={testCase.expectedOutput}
                         onChange={(e) => updateTestCase(index, 'expectedOutput', e.target.value)}
                       />
-                    </Box>
+                    </Field.Root>
                   </Box>
                 ))}
               </VStack>
             </Box>
+
+            {/* 通用错误显示 */}
+            {errors.general && (
+              <Field.Root invalid>
+                <Field.ErrorText>{errors.general}</Field.ErrorText>
+              </Field.Root>
+            )}
           </VStack>
         
         <Flex justifyContent="center" mt={8}>

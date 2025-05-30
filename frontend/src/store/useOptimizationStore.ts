@@ -775,6 +775,7 @@ export const useOptimizationStore = create<OptimizationState>()(
           
           // 当用户点击停止时，提示用户
           toaster.create({
+            title: "停止优化",
             description: "当前已发送的请求返回后，任务将停止",
             type: "default",
           });
