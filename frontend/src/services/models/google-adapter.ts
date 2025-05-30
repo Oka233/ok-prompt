@@ -7,17 +7,30 @@ const clientCache = new Map<string, GoogleGenAI>();
 /**
  * 获取Google客户端实例
  */
-function getClient(apiKey: string): GoogleGenAI {
+function getClient(apiKey: string, baseUrl: string): GoogleGenAI {
+  // 创建缓存键，将 baseUrl 包含在内
+  const cacheKey = `${apiKey}:${baseUrl || ''}`;
+
   // 检查缓存中是否已有实例
-  if (clientCache.has(apiKey)) {
-    return clientCache.get(apiKey)!;
+  if (clientCache.has(cacheKey)) {
+    return clientCache.get(cacheKey)!;
   }
-  
+
+  let httpOptions: any = {};
+  if (baseUrl) {
+    httpOptions = {
+      baseUrl
+    }
+  }
+
   // 创建新实例
-  const client = new GoogleGenAI({ apiKey });
+  const client = new GoogleGenAI({
+    apiKey,
+    httpOptions
+  });
   
   // 缓存实例
-  clientCache.set(apiKey, client);
+  clientCache.set(cacheKey, client);
   
   return client;
 }
@@ -27,9 +40,10 @@ export class GoogleAdapter implements ModelProvider {
 
   constructor(
     private apiKey: string,
-    private modelName: string
+    private modelName: string,
+    private baseUrl: string
   ) {
-    this.client = getClient(apiKey);
+    this.client = getClient(apiKey, baseUrl);
   }
 
   /**
@@ -66,6 +80,7 @@ export class GoogleAdapter implements ModelProvider {
           systemInstruction,
           thinkingConfig: {
             includeThoughts: true,
+            thinkingBudget: 0, // 非流式调用时，思考预算设置为0
           },
           ...options,
         },

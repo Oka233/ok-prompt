@@ -35,7 +35,7 @@ export interface ModelProvider {
   
   // 流式调用
   generateCompletionStream(
-    messages: ModelMessage[], 
+    messages: ModelMessage[],
     callbacks: StreamCallbacks,
     options?: ModelOptions
   ): Promise<void>;

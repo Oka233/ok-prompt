@@ -14,51 +14,97 @@ import {
   Image,
   CloseButton,
   Dialog,
+  Select,
+  createListCollection,
 } from '@chakra-ui/react'
 import { Table } from '@chakra-ui/react'
 import { toaster } from "@/components/ui/toaster"
 import { FiPlus, FiEdit2, FiTrash2, FiSave, FiXCircle } from 'react-icons/fi'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 import { ModelConfig, ModelType } from '@/types/optimization'
 
 // 导入模型图标
-import openaiIcon from '@/assets/providers/openai.jpeg'
+import openaiIcon from '@/assets/providers/openai.png'
 import geminiIcon from '@/assets/providers/gemini.png'
-import dashscopeIcon from '@/assets/providers/bailian.png'
+import qwenIcon from '@/assets/providers/qwenlm.png'
 import deepseekIcon from '@/assets/providers/deepseek.png'
+
+// 供应商类型定义
+export enum ProviderType {
+  DASHSCOPE = 'dashscope',
+  OPENROUTER = 'openrouter',
+  DEEPSEEK = 'deepseek',
+  GOOGLE = 'google',
+  OPENAI = 'openai',
+  CUSTOM = 'custom'
+}
+
+const providers = {
+  [ProviderType.DASHSCOPE]: {
+    value: ProviderType.DASHSCOPE,
+    title: '百炼',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+  },
+  [ProviderType.OPENROUTER]: {
+    value: ProviderType.OPENROUTER,
+    title: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1'
+  },
+  [ProviderType.GOOGLE]: {
+    value: ProviderType.GOOGLE,
+    title: 'Google',
+    baseUrl: ''
+  }
+}
 
 // 模型类型配置
 const modelTypeOptions = [
   {
-    value: ModelType.DASHSCOPE,
-    title: '阿里云百炼',
-    description: '使用阿里云百炼API',
-    icon: dashscopeIcon
+    value: ModelType.QWEN,
+    title: '通义千问',
+    description: '阿里巴巴',
+    icon: qwenIcon,
+    providerOptions: [
+      providers[ProviderType.DASHSCOPE],
+      providers[ProviderType.OPENROUTER]
+    ]
   },
   {
     value: ModelType.DEEPSEEK,
     title: 'DeepSeek',
-    description: '使用DeepSeek API',
-    icon: deepseekIcon
+    description: '深度求索',
+    icon: deepseekIcon,
+    providerOptions: [
+      { value: ProviderType.DEEPSEEK, title: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1' },
+      providers[ProviderType.DASHSCOPE],
+      providers[ProviderType.OPENROUTER]
+    ]
   },
   {
-    value: ModelType.GOOGLE,
+    value: ModelType.GEMINI,
     title: 'Gemini',
-    description: '使用Google AI API',
-    icon: geminiIcon
+    description: 'Google',
+    icon: geminiIcon,
+    providerOptions: [
+      providers[ProviderType.GOOGLE]
+    ]
   },
   {
     value: ModelType.OPENAI,
     title: 'OpenAI',
-    description: '使用OpenAI API',
-    icon: openaiIcon
+    description: 'OpenAI',
+    icon: openaiIcon,
+    providerOptions: [
+      { value: ProviderType.OPENAI, title: 'OpenAI', baseUrl: 'https://api.openai.com/v1' }
+    ]
   },
   {
     value: ModelType.OPENAI_COMPATIBLE,
     title: 'OpenAI兼容',
-    description: '兼容OpenAI接口的API',
-    icon: openaiIcon
+    description: '兼容OpenAI规范的API',
+    icon: openaiIcon,
+    providerOptions: []
   },
 ]
 
@@ -73,6 +119,7 @@ export function ModelManagement() {
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [selectedModelType, setSelectedModelType] = useState<ModelType>(modelTypeOptions[0].value)
+  const [selectedProvider, setSelectedProvider] = useState<string>(modelTypeOptions[0].providerOptions[0]?.value || '')
   const [error, setError] = useState<string | null>(null)
   // 添加状态变量跟踪用户是否手动编辑过展示名称
   const [isDisplayNameEdited, setIsDisplayNameEdited] = useState(false)
@@ -82,6 +129,43 @@ export function ModelManagement() {
 
   const initialRef = useRef<HTMLInputElement>(null)
   
+  // 当前选中模型类型的配置
+  const currentModelTypeConfig = modelTypeOptions.find(opt => opt.value === selectedModelType) || modelTypeOptions[0];
+  
+  // 当前模型类型的供应商选项（添加自定义选项）
+  const providerOptions = [...(currentModelTypeConfig.providerOptions || [])];
+  
+  // 如果有供应商选项，添加自定义选项
+  if (providerOptions.length > 0) {
+    providerOptions.push({ value: ProviderType.CUSTOM, title: '自定义', baseUrl: '' });
+  }
+  
+  // 当前选中的供应商配置
+  const currentProviderConfig = providerOptions.find(p => p.value === selectedProvider) || null;
+  
+  // 是否需要显示供应商选择
+  const shouldShowProviderSelect = providerOptions.length > 0;
+  
+  // 是否需要显示自定义基础URL输入框
+  const shouldShowBaseUrlInput = providerOptions.length === 0 || currentProviderConfig?.value === ProviderType.CUSTOM;
+  
+  // 当模型类型变更时，重置供应商选择
+  useEffect(() => {
+    const currentConfig = modelTypeOptions.find(opt => opt.value === selectedModelType);
+    const options = currentConfig?.providerOptions || [];
+
+    setBaseUrl('');
+    
+    if (options.length > 0) {
+      // 设置为第一个供应商选项
+      setSelectedProvider(options[0].value);
+      setBaseUrl(options[0].baseUrl);
+    } else {
+      // 清空供应商选择
+      setSelectedProvider('');
+    }
+  }, [selectedModelType]);
+  
   const handleAddModel = () => {
     setIsEditing(false)
     setCurrentModel(null)
@@ -90,6 +174,7 @@ export function ModelManagement() {
     setApiKey('')
     setBaseUrl('')
     setSelectedModelType(modelTypeOptions[0].value)
+    setSelectedProvider(modelTypeOptions[0].providerOptions[0]?.value || '')
     setError(null)
     setIsDisplayNameEdited(false)
     onOpen()
@@ -101,8 +186,29 @@ export function ModelManagement() {
     setModelName(model.name)
     setDisplayName(model.displayName)
     setApiKey(model.apiKey)
-    setBaseUrl(model.baseUrl || '')
+    setBaseUrl(model.baseUrl)
     setSelectedModelType(model.modelType)
+    
+    // 尝试从baseUrl找到匹配的供应商
+    const modelTypeConfig = modelTypeOptions.find(opt => opt.value === model.modelType);
+    if (modelTypeConfig && modelTypeConfig.providerOptions.length > 0) {
+      // 首先尝试精确匹配 baseUrl
+      const providerMatch = modelTypeConfig.providerOptions.find(p => p.baseUrl === model.baseUrl);
+      if (providerMatch) {
+        setSelectedProvider(providerMatch.value);
+      } else if (model.baseUrl) {
+        // 如果有baseUrl但没找到匹配的供应商，设为自定义
+        setSelectedProvider(ProviderType.CUSTOM);
+      } else {
+        // 如果没有baseUrl，使用第一个供应商
+        setSelectedProvider(modelTypeConfig.providerOptions[0].value);
+      }
+    } else {
+      // 对于没有供应商选项的模型类型（如OpenAI兼容）
+      console.log('无供应商选项的模型类型');
+      setSelectedProvider('');
+    }
+    
     setError(null)
     setIsDisplayNameEdited(true) // 编辑模式下默认认为展示名称已编辑
     onOpen()
@@ -176,8 +282,9 @@ export function ModelManagement() {
     }
     
     let finalBaseUrl = baseUrl.trim(); 
-    if (selectedModelType === ModelType.OPENAI_COMPATIBLE && !finalBaseUrl) {
-      setError('OpenAI兼容模型需要提供基础URL');
+    
+    if (ModelType.GEMINI !== selectedModelType && !finalBaseUrl) {
+      setError('需要提供基础URL');
       return;
     }
     
@@ -187,7 +294,7 @@ export function ModelManagement() {
           name: modelName,
           displayName,
           apiKey,
-          baseUrl: selectedModelType === ModelType.OPENAI_COMPATIBLE ? finalBaseUrl : undefined,
+          baseUrl: finalBaseUrl,
           modelType: selectedModelType
         })
         toaster.create({
@@ -196,7 +303,7 @@ export function ModelManagement() {
           type: "success",
         })
       } else {
-        await addModel(modelName, displayName, apiKey, selectedModelType === ModelType.OPENAI_COMPATIBLE ? finalBaseUrl : '', selectedModelType)
+        await addModel(modelName, displayName, apiKey, finalBaseUrl, selectedModelType)
         toaster.create({
           title: "添加成功",
           description: "模型已成功添加",
@@ -229,6 +336,34 @@ export function ModelManagement() {
     }
   }
   
+  // 处理供应商变更
+  const handleProviderChange = (value: string) => {
+    setSelectedProvider(value);
+    const provider = providerOptions.find(p => p.value === value);
+    if (provider && provider.value !== ProviderType.CUSTOM) {
+      setBaseUrl(provider.baseUrl);
+    } else {
+      setBaseUrl('');
+    }
+  };
+  
+  // 添加参考元素
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  // 供应商类型定义的接口
+  interface ProviderOption {
+    label: string;
+    value: string;
+  }
+  
+  // 创建供应商选项集合
+  const providerCollection = createListCollection<ProviderOption>({
+    items: providerOptions.map(provider => ({ 
+      label: provider.title, 
+      value: provider.value 
+    }))
+  });
+  
   // 隐藏API密钥的辅助函数
   const maskApiKey = (key: string) => {
     if (key.length <= 8) return '********'
@@ -240,7 +375,7 @@ export function ModelManagement() {
     const option = modelTypeOptions.find(opt => opt.value === type)
     return option ? option.title : '未知'
   }
-  
+
   return (
     <Box p={6}>
       <Flex justifyContent="space-between" alignItems="center" mb={6}>
@@ -409,7 +544,7 @@ export function ModelManagement() {
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
-            <Dialog.Content maxW="800px">
+            <Dialog.Content maxW="800px"  ref={contentRef}>
               <Dialog.Header>
                 <Dialog.Title>{isEditing ? '编辑模型' : '添加模型'}</Dialog.Title>
               </Dialog.Header>
@@ -425,7 +560,7 @@ export function ModelManagement() {
                 <Flex gap={6}>
                   {/* 左侧模型类型选择 */}
                   <Box width="250px">
-                    <Text mb={2} fontWeight="medium">模型供应商</Text>
+                    <Text mb={2} fontWeight="medium">模型</Text>
                     <RadioCard.Root value={selectedModelType}>
                       <VStack align="stretch">
                         {modelTypeOptions.map((item) => (
@@ -503,8 +638,47 @@ export function ModelManagement() {
                         onChange={(e) => setApiKey(e.target.value)}
                       />
                     </Box>
+                    
+                    {/* 供应商选择 */}
+                    {shouldShowProviderSelect && (
+                      <Box mb={4}>
+                        <Text mb={2} fontWeight="medium">供应商</Text>
+                        <Select.Root 
+                          collection={providerCollection}
+                          onValueChange={(details) => {
+                            if (details.value && details.value.length > 0) {
+                              handleProviderChange(details.value[0]);
+                            }
+                          }}
+                          value={selectedProvider ? [selectedProvider] : []}
+                        >
+                          <Select.HiddenSelect />
+                          <Select.Control>
+                            <Select.Trigger>
+                              <Select.ValueText placeholder="选择供应商" />
+                            </Select.Trigger>
+                            <Select.IndicatorGroup>
+                              <Select.Indicator />
+                            </Select.IndicatorGroup>
+                          </Select.Control>
+                          <Portal container={contentRef}>
+                            <Select.Positioner>
+                              <Select.Content>
+                                {providerCollection.items.map((item) => (
+                                  <Select.Item key={item.value} item={item}>
+                                    {item.label}
+                                    <Select.ItemIndicator />
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Positioner>
+                          </Portal>
+                        </Select.Root>
+                      </Box>
+                    )}
 
-                    {selectedModelType === ModelType.OPENAI_COMPATIBLE && (
+                    {/* 基础URL输入框 */}
+                    {shouldShowBaseUrlInput && (
                       <Box mb={4}>
                         <Text mb={2} fontWeight="medium">基础URL</Text>
                         <Input

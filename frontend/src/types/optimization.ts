@@ -14,8 +14,8 @@ export interface TestSet {
 export enum ModelType {
   OPENAI = 'openai',
   OPENAI_COMPATIBLE = 'openai_compatible',
-  GOOGLE = 'google',
-  DASHSCOPE = 'dashscope',
+  GEMINI = 'gemini',
+  QWEN = 'qwen',
   DEEPSEEK = 'deepseek'
 }
 
@@ -25,7 +25,7 @@ export interface ModelConfig {
   name: string;
   displayName: string;
   apiKey: string;
-  baseUrl?: string;
+  baseUrl: string;
   modelType: ModelType;
 }
 
