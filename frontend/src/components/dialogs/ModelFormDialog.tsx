@@ -20,40 +20,13 @@ import { useState, useRef, useEffect } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 import { ModelConfig, ModelType } from '@/types/optimization'
 import { toaster } from "@/components/ui/toaster"
+import { providers, ProviderType } from '@/services/models/providers'
 
 // 导入模型图标
 import openaiIcon from '@/assets/providers/openai.png'
 import geminiIcon from '@/assets/providers/gemini.png'
 import qwenIcon from '@/assets/providers/qwenlm.png'
 import deepseekIcon from '@/assets/providers/deepseek.png'
-
-// 供应商类型定义
-export enum ProviderType {
-  DASHSCOPE = 'dashscope',
-  OPENROUTER = 'openrouter',
-  DEEPSEEK = 'deepseek',
-  GOOGLE = 'google',
-  OPENAI = 'openai',
-  CUSTOM = 'custom'
-}
-
-const providers = {
-  [ProviderType.DASHSCOPE]: {
-    value: ProviderType.DASHSCOPE,
-    title: '阿里云百炼',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-  },
-  [ProviderType.OPENROUTER]: {
-    value: ProviderType.OPENROUTER,
-    title: 'OpenRouter',
-    baseUrl: 'https://openrouter.ai/api/v1'
-  },
-  [ProviderType.GOOGLE]: {
-    value: ProviderType.GOOGLE,
-    title: 'Google',
-    baseUrl: ''
-  }
-}
 
 // 模型类型配置
 const modelTypeOptions = [

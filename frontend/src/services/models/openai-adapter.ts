@@ -32,15 +32,19 @@ function getClient(apiKey: string, baseUrl?: string): OpenAI {
 export class OpenAIAdapter implements ModelProvider {
   private client: OpenAI;
   reasoning: boolean;
+  modelName: string;
+  baseUrl: string;
 
   constructor(
-    private apiKey: string,
-    private modelName: string,
-    private baseUrl: string,
+    apiKey: string,
+    modelName: string,
+    baseUrl: string,
     reasoning: boolean
   ) {
     this.client = getClient(apiKey, baseUrl);
     this.reasoning = reasoning;
+    this.modelName = modelName;
+    this.baseUrl = baseUrl;
   }
 
   /**
@@ -127,21 +131,7 @@ export class OpenAIAdapter implements ModelProvider {
       let thought = ''; // 用于累积推理内容
       
       for await (const chunk of stream) {
-        // 处理推理内容
-        const reasoningContent = (chunk.choices?.[0]?.delta as any)?.reasoning_content;
-        if (reasoningContent) {
-          thought += reasoningContent;
-          callbacks.onContent(thought, fullContent);
-        }
-        
-        // 处理内容更新
-        if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0]?.delta?.content) {
-          const content = chunk.choices[0].delta.content;
-          fullContent += content;
-          callbacks.onContent(thought, fullContent);
-        }
-        
-        // 处理token用量信息（在最后一个chunk中）
+        // 处理token用量信息（通常在最后一个chunk中）
         if (chunk.usage) {
           const usage = {
             promptTokens: chunk.usage.prompt_tokens || 0,
@@ -151,6 +141,25 @@ export class OpenAIAdapter implements ModelProvider {
           if (callbacks.onUsage) {
             callbacks.onUsage(usage);
           }
+        }
+
+        if (!chunk.choices || chunk.choices.length === 0 || !chunk.choices[0].delta) {
+          continue;
+        }
+        
+        const chunkDelta = chunk.choices[0].delta as any;
+        
+        // 推理
+        const reasoningContent = chunkDelta.reasoning_content || chunkDelta.reasoning;
+        if (reasoningContent) {
+          thought += reasoningContent;
+          callbacks.onContent(thought, fullContent);
+        }
+        
+        // 回答
+        if (chunk.choices[0].delta.content) {
+          fullContent += chunk.choices[0].delta.content;
+          callbacks.onContent(thought, fullContent);
         }
       }
       
