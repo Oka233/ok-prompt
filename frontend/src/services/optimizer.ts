@@ -355,7 +355,7 @@ export async function summarizeEvaluation({
     {
       onContent: (thought, answer) => {
         if (!answer) {
-          fullContent = `<思考中> ${getPlaceholderIfEmpty(thought)}`;
+          fullContent = `<思考中> ${getPlaceholderIfEmpty(thought.trim())}`;
         } else {
           const { content } = filterContentByTag(answer, 'Summary');
           fullContent = getPlaceholderIfEmpty(content);
@@ -461,7 +461,7 @@ export async function optimizePrompt({
         if (thought) {
           // 推理模型，返回thought
           if (!answer) {
-            fullContent = `<思考中> \n${getPlaceholderIfEmpty(thought)}`;
+            fullContent = `<思考中> \n${getPlaceholderIfEmpty(thought.trim())}`;
           } else {
             fullContent = getPlaceholderIfEmpty(promptContent);
           }
