@@ -4,14 +4,13 @@ import {
   Portal,
   CloseButton,
   Dialog,
-  Select,
-  createListCollection,
   Checkbox,
   Field
 } from '@chakra-ui/react'
 import { FiSave, FiXCircle } from 'react-icons/fi'
 import { useState, useRef, useEffect } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
+import { ModelSelect } from '@/components/ModelSelect'
 
 interface ModelOption {
   label: string;
@@ -26,7 +25,7 @@ interface TaskSettingsDialogProps {
 }
 
 export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDialogProps) {
-  const { models, updateTaskModels, updateTaskFeedbackSetting } = useOptimizationStore();
+  const { updateTaskModels, updateTaskFeedbackSetting } = useOptimizationStore();
   const tasks = useOptimizationStore(state => state.tasks);
   
   // 获取当前任务
@@ -46,10 +45,6 @@ export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDial
       setRequireUserFeedback(currentTask.requireUserFeedback || false);
     }
   }, [currentTask]);
-
-  const modelOptionsCollection = createListCollection<ModelOption>({
-    items: models.map(model => ({ label: model.displayName, value: model.id }))
-  });
 
   const handleSaveSettings = async () => {
     // 更新模型设置
@@ -84,66 +79,22 @@ export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDial
               <VStack gap={4} align="stretch">
                 <Field.Root>
                   <Field.Label mb={1} fontSize="sm" fontWeight="medium">目标模型</Field.Label>
-                  <Select.Root
-                    collection={modelOptionsCollection}
-                    size="sm"
-                    onValueChange={(details) => setSelectedTargetModel(details.value?.[0])}
-                    value={selectedTargetModel ? [selectedTargetModel] : []}
-                  >
-                    <Select.HiddenSelect />
-                    <Select.Control>
-                      <Select.Trigger>
-                        <Select.ValueText placeholder="选择目标模型" />
-                      </Select.Trigger>
-                      <Select.IndicatorGroup>
-                        <Select.Indicator />
-                      </Select.IndicatorGroup>
-                    </Select.Control>
-                    <Portal container={contentRef}>
-                      <Select.Positioner>
-                        <Select.Content>
-                          {modelOptionsCollection.items.map((modelItem: ModelOption) => (
-                            <Select.Item item={modelItem} key={modelItem.value}>
-                              {modelItem.label}
-                              <Select.ItemIndicator />
-                            </Select.Item>
-                          ))}
-                        </Select.Content>
-                      </Select.Positioner>
-                    </Portal>
-                  </Select.Root>
+                  <ModelSelect
+                    value={selectedTargetModel}
+                    onChange={setSelectedTargetModel}
+                    placeholder="选择目标模型"
+                    containerRef={contentRef}
+                  />
                 </Field.Root>
                 
                 <Field.Root>
                   <Field.Label mb={1} fontSize="sm" fontWeight="medium">优化模型</Field.Label>
-                  <Select.Root
-                    collection={modelOptionsCollection}
-                    size="sm"
-                    onValueChange={(details) => setSelectedOptimizationModel(details.value?.[0])}
-                    value={selectedOptimizationModel ? [selectedOptimizationModel] : []}
-                  >
-                    <Select.HiddenSelect />
-                    <Select.Control>
-                      <Select.Trigger>
-                        <Select.ValueText placeholder="选择优化模型" />
-                      </Select.Trigger>
-                      <Select.IndicatorGroup>
-                        <Select.Indicator />
-                      </Select.IndicatorGroup>
-                    </Select.Control>
-                    <Portal container={contentRef}>
-                      <Select.Positioner>
-                        <Select.Content>
-                          {modelOptionsCollection.items.map((modelItem: ModelOption) => (
-                            <Select.Item item={modelItem} key={modelItem.value}>
-                              {modelItem.label}
-                              <Select.ItemIndicator />
-                            </Select.Item>
-                          ))}
-                        </Select.Content>
-                      </Select.Positioner>
-                    </Portal>
-                  </Select.Root>
+                  <ModelSelect
+                    value={selectedOptimizationModel}
+                    onChange={setSelectedOptimizationModel}
+                    placeholder="选择优化模型"
+                    containerRef={contentRef}
+                  />
                 </Field.Root>
                 
                 <Field.Root>

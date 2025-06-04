@@ -17,7 +17,7 @@ import {
 import { FiUploadCloud, FiPlus, FiTrash2, FiLayers } from 'react-icons/fi'
 import { useState, useMemo, useEffect } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore.ts'
-import { ModelConfig } from '@/types/optimization.ts'
+import { ModelSelect } from '@/components/ModelSelect'
 
 interface NoDatasetViewProps {
   onUpload: () => void
@@ -39,12 +39,6 @@ const testModeOptions = createListCollection({
     { label: '描述性模式', value: 'descriptive' }
   ] as TestModeOption[]
 })
-
-const createModelListCollection = (models: ModelConfig[]) => {
-  return createListCollection({
-    items: models.map(model => ({ label: model.displayName, value: model.id }))
-  });
-};
 
 // 添加错误类型定义
 interface FormErrors {
@@ -69,8 +63,6 @@ export function OptimizationTaskCreation({ onUpload }: NoDatasetViewProps) {
   const [optimizationModelId, setOptimizationModelId] = useState<string | undefined>(undefined);
   const [requireUserFeedback, setRequireUserFeedback] = useState(false);
 
-  const modelOptions = useMemo(() => createModelListCollection(models), [models]);
-  
   useEffect(() => {
     if (models.length > 0) {
       setTargetModelId(models[0].id);
@@ -310,82 +302,20 @@ export function OptimizationTaskCreation({ onUpload }: NoDatasetViewProps) {
 
             <Field.Root>
               <Field.Label fontWeight="medium">目标模型</Field.Label>
-              <Select.Root 
-                collection={modelOptions} 
-                size="sm" 
-                onValueChange={(details) => { 
-                  setTargetModelId(details.value && details.value.length > 0 ? details.value[0] : undefined);
-                }}
-                value={targetModelId ? [targetModelId] : []}
-              >
-                <Select.HiddenSelect />
-                <Select.Control>
-                  <Select.Trigger>
-                    <Select.ValueText placeholder="选择目标模型" />
-                  </Select.Trigger>
-                  <Select.IndicatorGroup>
-                    <Select.Indicator />
-                  </Select.IndicatorGroup>
-                </Select.Control>
-                <Portal>
-                  <Select.Positioner>
-                    <Select.Content>
-                      {modelOptions.items.length > 0 ? (
-                        modelOptions.items.map((model) => (
-                          <Select.Item item={model} key={model.value}>
-                            {model.label}
-                            <Select.ItemIndicator />
-                          </Select.Item>
-                        ))
-                      ) : (
-                        <Select.Item item={{value: '__placeholder__', label: '没有可用的模型'}}>
-                           没有可用的模型
-                        </Select.Item>
-                      )}
-                    </Select.Content>
-                  </Select.Positioner>
-                </Portal>
-              </Select.Root>
+              <ModelSelect
+                value={targetModelId}
+                onChange={setTargetModelId}
+                placeholder="选择目标模型"
+              />
             </Field.Root>
 
             <Field.Root>
               <Field.Label fontWeight="medium">优化模型</Field.Label>
-              <Select.Root 
-                collection={modelOptions} 
-                size="sm" 
-                onValueChange={(details) => { 
-                  setOptimizationModelId(details.value && details.value.length > 0 ? details.value[0] : undefined);
-                }}
-                value={optimizationModelId ? [optimizationModelId] : []}
-              >
-                <Select.HiddenSelect />
-                <Select.Control>
-                  <Select.Trigger>
-                    <Select.ValueText placeholder="选择优化模型" />
-                  </Select.Trigger>
-                  <Select.IndicatorGroup>
-                    <Select.Indicator />
-                  </Select.IndicatorGroup>
-                </Select.Control>
-                <Portal>
-                  <Select.Positioner>
-                    <Select.Content>
-                      {modelOptions.items.length > 0 ? (
-                        modelOptions.items.map((model) => (
-                          <Select.Item item={model} key={model.value}>
-                            {model.label}
-                            <Select.ItemIndicator />
-                          </Select.Item>
-                        ))
-                      ) : (
-                         <Select.Item item={{value: '__placeholder__', label: '没有可用的模型'}}>
-                           没有可用的模型
-                        </Select.Item>
-                      )}
-                    </Select.Content>
-                  </Select.Positioner>
-                </Portal>
-              </Select.Root>
+              <ModelSelect
+                value={optimizationModelId}
+                onChange={setOptimizationModelId}
+                placeholder="选择优化模型"
+              />
             </Field.Root>
 
             <Field.Root>
