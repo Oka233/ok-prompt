@@ -10,7 +10,7 @@ import {
   Clipboard,
   Spacer
 } from '@chakra-ui/react'
-import { useCurrentTestCases } from '@/store/useOptimizationStore'
+import { useCurrentTestCases } from '@/store/useOptimizationStore.ts'
 
 export function TestCaseTable() {
   const currentTestCases = useCurrentTestCases()

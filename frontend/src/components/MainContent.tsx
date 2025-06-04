@@ -1,7 +1,7 @@
 import { Box } from '@chakra-ui/react'
-import { NoDatasetView } from '@/components/NoDatasetView'
-import { DatasetUploadedView } from '@/components/DatasetUploadedView'
-import { ModelManagement } from '@/components/ModelManagement'
+import { OptimizationTaskCreation } from '@/views/OptimizationTaskCreation.tsx'
+import { OptimizationTask } from '@/views/OptimizationTask'
+import { ModelManagement } from '@/views/ModelManagement.tsx'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
 
 export function MainContent() {
@@ -18,11 +18,11 @@ export function MainContent() {
     >
       <Box flexGrow={1} overflow="auto">
         {viewState === 'task_view' ? (
-          <DatasetUploadedView />
+          <OptimizationTask />
         ) : viewState === 'model_management' ? (
           <ModelManagement />
         ) : (
-          <NoDatasetView onUpload={() => setViewState('task_view')} />
+          <OptimizationTaskCreation onUpload={() => setViewState('task_view')} />
         )}
       </Box>
     </Box>

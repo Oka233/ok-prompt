@@ -14,9 +14,9 @@ import {
 import { useState } from 'react'
 import { BiChevronDown } from 'react-icons/bi'
 import { FiCheck } from 'react-icons/fi'
-import { useCurrentPromptIterations } from '@/store/useOptimizationStore'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
-import { toaster } from "@/components/ui/toaster"
+import { useCurrentPromptIterations } from '@/store/useOptimizationStore.ts'
+import { useOptimizationStore } from '@/store/useOptimizationStore.ts'
+import { toaster } from "@/components/ui/toaster.tsx"
 
 export function PromptIterationList() {
   const currentPromptIterations = useCurrentPromptIterations()

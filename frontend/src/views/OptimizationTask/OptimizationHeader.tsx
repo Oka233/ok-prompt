@@ -11,12 +11,12 @@ import {
   Spinner
 } from '@chakra-ui/react'
 import { FiTrash2, FiSettings, FiPlay, FiStopCircle } from 'react-icons/fi'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
+import { useOptimizationStore } from '@/store/useOptimizationStore.ts'
 import { MdTune } from 'react-icons/md';
-import { TaskSettingsDialog } from './dialogs/TaskSettingsDialog'
-import { ModelParamsDialog } from './dialogs/ModelParamsDialog'
-import { ConfirmDeleteDialog } from './dialogs/ConfirmDeleteDialog'
-import { toaster } from "@/components/ui/toaster"
+import { TaskSettingsDialog } from '../../components/dialogs/TaskSettingsDialog.tsx'
+import { ModelParamsDialog } from '../../components/dialogs/ModelParamsDialog.tsx'
+import { ConfirmDeleteDialog } from '../../components/dialogs/ConfirmDeleteDialog.tsx'
+import { toaster } from "@/components/ui/toaster.tsx"
 
 export function OptimizationHeader() {
   const direction = useBreakpointValue({ base: 'column', md: 'row' }) || 'column';

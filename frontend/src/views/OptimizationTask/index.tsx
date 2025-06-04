@@ -1,10 +1,10 @@
 import { Box, Flex, Heading, useBreakpointValue } from '@chakra-ui/react'
-import { OptimizationHeader } from '@/components/OptimizationHeader'
-import { PromptIterationList } from './PromptIterationList'
-import { TestCaseTable } from '@/components/TestCaseTable'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
+import { OptimizationHeader } from '@/views/OptimizationTask/OptimizationHeader.tsx'
+import { PromptIterationList } from './PromptIterationList.tsx'
+import { TestCaseTable } from '@/views/OptimizationTask/TestCaseTable.tsx'
+import { useOptimizationStore } from '@/store/useOptimizationStore.ts'
 
-export function DatasetUploadedView() {
+export function OptimizationTask() {
   const { tasks, currentTaskId } = useOptimizationStore()
   // 使用响应式布局
   const direction = useBreakpointValue({ base: 'column', lg: 'row' }) || 'column';

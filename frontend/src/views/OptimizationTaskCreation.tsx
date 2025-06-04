@@ -16,8 +16,8 @@ import {
 } from '@chakra-ui/react'
 import { FiUploadCloud, FiPlus, FiTrash2, FiLayers } from 'react-icons/fi'
 import { useState, useMemo, useEffect } from 'react'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
-import { ModelConfig } from '@/types/optimization'
+import { useOptimizationStore } from '@/store/useOptimizationStore.ts'
+import { ModelConfig } from '@/types/optimization.ts'
 
 interface NoDatasetViewProps {
   onUpload: () => void
@@ -54,7 +54,7 @@ interface FormErrors {
   general?: string; // 用于通用错误
 }
 
-export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
+export function OptimizationTaskCreation({ onUpload }: NoDatasetViewProps) {
   const [taskName, setTaskName] = useState('');
   const [initialPrompt, setInitialPrompt] = useState('');
   const [testMode, setTestMode] = useState('strict');

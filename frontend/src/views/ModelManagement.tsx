@@ -9,13 +9,13 @@ import {
   Image
 } from '@chakra-ui/react'
 import { Table } from '@chakra-ui/react'
-import { toaster } from "@/components/ui/toaster"
+import { toaster } from "@/components/ui/toaster.tsx"
 import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi'
 import { useState } from 'react'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
-import { ModelConfig, ModelType } from '@/types/optimization'
-import { ModelFormDialog } from './dialogs/ModelFormDialog'
-import { ConfirmDeleteDialog } from './dialogs/ConfirmDeleteDialog'
+import { useOptimizationStore } from '@/store/useOptimizationStore.ts'
+import { ModelConfig, ModelType } from '@/types/optimization.ts'
+import { ModelFormDialog } from '../components/dialogs/ModelFormDialog.tsx'
+import { ConfirmDeleteDialog } from '../components/dialogs/ConfirmDeleteDialog.tsx'
 
 // 导入模型图标
 import openaiIcon from '@/assets/providers/openai.png'
