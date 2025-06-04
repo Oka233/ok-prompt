@@ -28,7 +28,7 @@ export class OpenRouterAdapter extends OpenAIAdapter {
         messages: ModelMessage[],
         options?: ModelOptions
     ): Promise<ModelResponse> {
-        if (this.reasoning && this.modelName.includes('qwen3')) {
+        if (this.modelName.includes('qwen3')) {
             messages = adaptQwen3ThinkingPrompt(messages, false);
         }
         const response = await super.generateCompletion(messages, options);
@@ -40,7 +40,7 @@ export class OpenRouterAdapter extends OpenAIAdapter {
         callbacks: StreamCallbacks,
         options?: ModelOptions
     ): Promise<void> {
-        if (this.reasoning && this.modelName.includes('qwen3')) {
+        if (this.modelName.includes('qwen3')) {
             messages = adaptQwen3ThinkingPrompt(messages, this.reasoning);
         }
         const response = await super.generateCompletionStream(messages, callbacks, options);
