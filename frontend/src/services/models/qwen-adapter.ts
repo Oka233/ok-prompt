@@ -15,6 +15,12 @@ export class QwenAdapter extends OpenAIAdapter {
         messages: ModelMessage[],
         options?: ModelOptions
     ): Promise<ModelResponse> {
+        if (this.reasoning) {
+            options = {
+                ...options,
+                enable_thinking: false,
+            }
+        }
         const response = await super.generateCompletion(messages, options);
         return response;
     }
@@ -24,6 +30,12 @@ export class QwenAdapter extends OpenAIAdapter {
         callbacks: StreamCallbacks,
         options?: ModelOptions
     ): Promise<void> {
+        if (this.reasoning) {
+            options = {
+                ...options,
+                enable_thinking: true,
+            }
+        }
         const response = await super.generateCompletionStream(messages, callbacks, options);
         return response;
     }
