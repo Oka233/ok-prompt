@@ -18,7 +18,7 @@ export function DatasetUploadedView() {
   }
 
   return (
-    <Flex flexDirection="column" width="100%" height="100%">
+    <Flex flexDirection="column" width="100%" height="100%" gap={6} p={6}>
       <OptimizationHeader />
 
       <Flex 

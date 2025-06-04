@@ -9,8 +9,7 @@ export function MainContent() {
   
   return (
     <Box 
-      flex="1" 
-      p={{ base: 4, md: 6 }}
+      flex="1"
       overflow="hidden"
       display="flex"
       flexDirection="column"

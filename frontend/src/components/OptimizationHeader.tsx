@@ -74,13 +74,12 @@ export function OptimizationHeader() {
 
   return (
     <Box 
-      bg="white" 
-      shadow="sm" 
+      bg="white"
+      shadow="sm"
       borderRadius="lg"
       borderWidth="1px"
       borderColor="gray.200"
-      p={{ base: 4, md: 5 }} 
-      mb={{ base: 4, md: 6 }}
+      p={4}
       width="100%"
     >
       <Flex 

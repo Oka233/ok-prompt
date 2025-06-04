@@ -227,8 +227,8 @@ export function NoDatasetView({ onUpload }: NoDatasetViewProps) {
       flexDirection="column" 
       alignItems="center" 
       justifyContent="flex-start"
-      h="full"
       pt={10}
+      pb={6}
     >
       <Icon 
         as={FiLayers} 
