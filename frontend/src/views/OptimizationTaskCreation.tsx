@@ -125,7 +125,7 @@ export function OptimizationTaskCreation({ onUpload }: NoDatasetViewProps) {
         targetModelId,
         optimizationModelId,
         requireUserFeedback,
-        3
+        2
       );
       
       onUpload();
