@@ -3,7 +3,12 @@ import {
   Badge, 
   Text, 
   Flex,
-  Table
+  Table,
+  Popover,
+  Portal,
+  IconButton,
+  Clipboard,
+  Spacer
 } from '@chakra-ui/react'
 import { useCurrentTestCases } from '@/store/useOptimizationStore'
 
@@ -77,6 +82,50 @@ export function TestCaseTable() {
     );
   };
 
+  // 渲染可点击查看完整内容的文本
+  const renderPopoverText = (content: string) => {
+    return (
+      <Popover.Root size="xs">
+        <Popover.Trigger asChild>
+          <Text 
+            fontSize="sm" 
+            overflow="hidden" 
+            textOverflow="ellipsis" 
+            whiteSpace="nowrap"
+            lineClamp="2"
+            cursor="pointer"
+            _hover={{ textDecoration: "underline" }}
+          >
+            {content}
+          </Text>
+        </Popover.Trigger>
+        <Portal>
+          <Popover.Positioner>
+            <Popover.Content maxH="40vh" maxW="40vw" width="initial">
+              <Popover.Arrow />
+              <Popover.Header>
+                <Flex alignItems="center">
+                  <Text fontSize="sm" fontWeight="medium">内容详情</Text>
+                  <Spacer />
+                  <Clipboard.Root value={content} ml={2}>
+                    <Clipboard.Trigger asChild>
+                      <IconButton variant="ghost" size="xs" aria-label="复制内容">
+                        <Clipboard.Indicator />
+                      </IconButton>
+                    </Clipboard.Trigger>
+                  </Clipboard.Root>
+                </Flex>
+              </Popover.Header>
+              <Popover.Body overflowY="auto">
+                <Text whiteSpace="pre-wrap">{content}</Text>
+              </Popover.Body>
+            </Popover.Content>
+          </Popover.Positioner>
+        </Portal>
+      </Popover.Root>
+    );
+  };
+
   // 渲染测试用例的迭代结果
   const renderIterationResults = (testCase: any) => {
     const cells = [];
@@ -94,16 +143,7 @@ export function TestCaseTable() {
                   {renderScoreBadge(result.score)}
                 </Box>
               )}
-              <Text 
-                fontSize="sm" 
-                overflow="hidden" 
-                textOverflow="ellipsis" 
-                whiteSpace="nowrap"
-                lineClamp="2"
-                title={result.output}
-              >
-                {result.output}
-              </Text>
+              {renderPopoverText(result.output)}
             </Flex>
           </Table.Cell>
         );
@@ -127,26 +167,14 @@ export function TestCaseTable() {
             <Table.Row key={testCase.id}>
               {renderIterationResults(testCase)}
               <Table.Cell>
-                <Text 
-                  fontSize="sm" 
-                  overflow="hidden" 
-                  textOverflow="ellipsis" 
-                  whiteSpace="nowrap"
-                  title={testCase.input}
-                >
-                  {testCase.input}
-                </Text>
+                <Flex alignItems="center">
+                  {renderPopoverText(testCase.input)}
+                </Flex>
               </Table.Cell>
               <Table.Cell>
-                <Text 
-                  fontSize="sm" 
-                  overflow="hidden" 
-                  textOverflow="ellipsis" 
-                  whiteSpace="nowrap"
-                  title={testCase.expectedOutput}
-                >
-                  {testCase.expectedOutput}
-                </Text>
+                <Flex alignItems="center">
+                  {renderPopoverText(testCase.expectedOutput)}
+                </Flex>
               </Table.Cell>
             </Table.Row>
           ))}

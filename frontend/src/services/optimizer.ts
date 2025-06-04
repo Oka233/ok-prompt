@@ -360,7 +360,8 @@ export async function summarizeEvaluation({
           const { content } = filterContentByTag(answer, 'Summary');
           fullContent = getPlaceholderIfEmpty(content);
         }
-        onProgress(fullContent.trim());
+        fullContent = fullContent.trim();
+        onProgress(fullContent);
       },
       onUsage: (usage) => {
         tokenUsage = usage;
@@ -473,8 +474,8 @@ export async function optimizePrompt({
             fullContent = getPlaceholderIfEmpty(promptContent);
           }
         }
-        
-        onProgress(fullContent.trim());
+        fullContent = fullContent.trim();
+        onProgress(fullContent);
       },
       onUsage: (usage) => {
         tokenUsage = usage;

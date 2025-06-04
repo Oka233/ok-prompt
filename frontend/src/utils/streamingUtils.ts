@@ -31,7 +31,7 @@ export function filterContentByTag(
       // 找到了完整的标签对
       return {
         closed: true,
-        content: text.substring(lastOpenTagIndex + openTag.length, firstCloseTagIndexAfterLastOpen),
+        content: text.substring(lastOpenTagIndex + openTag.length, firstCloseTagIndexAfterLastOpen).trim(),
         hasPartialOpenTag: true,
       };
     }
@@ -59,7 +59,7 @@ export function filterContentByTag(
     determinedHasPartialOpenTag = true;
     return {
       closed: false,
-      content: currentContent.substring(lastCompleteOpenTagIndexInCurrent + openTag.length),
+      content: currentContent.substring(lastCompleteOpenTagIndexInCurrent + openTag.length).trim(),
       hasPartialOpenTag: determinedHasPartialOpenTag,
     };
   } else {
@@ -71,7 +71,7 @@ export function filterContentByTag(
         determinedHasPartialOpenTag = true;
         return {
           closed: false,
-          content: currentContent.substring(0, currentContent.length - partialOpenTag.length),
+          content: currentContent.substring(0, currentContent.length - partialOpenTag.length).trim(),
           hasPartialOpenTag: determinedHasPartialOpenTag,
         };
       }
@@ -83,7 +83,7 @@ export function filterContentByTag(
   //    此时 determinedHasPartialOpenTag 仍然是 false。
   return {
     closed: false,
-    content: currentContent,
+    content: currentContent.trim(),
     hasPartialOpenTag: determinedHasPartialOpenTag,
   };
 }
@@ -102,13 +102,9 @@ export function createThrottledStreamGenerator<T extends (messages: any[], callb
   return async function(messages: any[], callbacks: StreamCallbacks, options?: any): Promise<ReturnType<T>> {
     // 创建节流版本的 onContent 回调
     let lastCallTime = 0;
-    let latestThought: string = '';
-    let latestAnswer: string = '';
 
     // 节流处理函数
     const throttledOnContent = (thought: string, answer: string) => {
-      latestThought = thought;
-      latestAnswer = answer;
 
       const now = Date.now();
       

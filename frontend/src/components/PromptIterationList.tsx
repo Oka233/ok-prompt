@@ -7,7 +7,9 @@ import {
   Badge,
   Spinner,
   Textarea,
-  IconButton
+  IconButton,
+  Spacer,
+  Clipboard,
 } from '@chakra-ui/react'
 import { useState } from 'react'
 import { BiChevronDown } from 'react-icons/bi'
@@ -92,7 +94,7 @@ export function PromptIterationList() {
     }
 
     return (
-      <Flex alignItems="center" gap={2}>
+      <Flex alignItems="center" gap={2} width="100%">
         <Badge ml={2} colorPalette={stageColors[stage as keyof typeof stageColors]}>
           {stageText[stage as keyof typeof stageText]}
         </Badge>
@@ -108,6 +110,14 @@ export function PromptIterationList() {
         {currentTask?.status === 'in_progress' && item.iteration === currentIteration && (
           <Spinner size="sm" color="blue.500" />
         )}
+        <Spacer />
+        <Clipboard.Root value={item.prompt}>
+          <Clipboard.Trigger asChild>
+            <IconButton variant="ghost" size="xs">
+              <Clipboard.Indicator />
+            </IconButton>
+          </Clipboard.Trigger>
+        </Clipboard.Root>
       </Flex>
     )
   }
@@ -130,12 +140,12 @@ export function PromptIterationList() {
             transition="150ms ease-in-out"
           >
             <Flex alignItems="center">
-              <Text fontWeight="semibold" color={"gray.700"}>
+              <Text fontWeight="semibold" color={"gray.700"} whiteSpace="nowrap">
                 {item.iteration === 0 ? `初始提示词` : `优化提示词`} - 迭代 {item.iteration}
               </Text>
               {getStageBadge(item)}
             </Flex>
-            <Text fontSize="sm" color="gray.600" mt={2} mb={2}>
+            <Text fontSize="sm" color="gray.600" mt={2} mb={2} whiteSpace="pre-wrap">
               {item.prompt}
             </Text>
             
@@ -169,7 +179,7 @@ export function PromptIterationList() {
               </Button>
               
               {item.showReport && (
-                <Box mt={2} p={2} bg="gray.100" borderRadius="md" fontSize="xs" color="gray.600">
+                <Box mt={2} p={2} bg="gray.100" borderRadius="md" fontSize="xs" color="gray.600" whiteSpace="pre-wrap">
                   {item.reportSummary}
                 </Box>
               )}
