@@ -7,34 +7,42 @@ import { StreamCallbacks } from '@/types/model';
  *
  * @param text 要过滤的文本字符串。
  * @param tag 要查找的 HTML 标签名称 (例如 "summary", "div")。
- * @returns 一个包含 closed (布尔值) 和 content (过滤后的字符串) 的对象。
+ * @returns 一个包含 closed (布尔值), content (过滤后的字符串), 和 hasPartialOpenTag (布尔值) 的对象。
+ *          hasPartialOpenTag 为 true 表示匹配到了部分或全部开始标签，该标签影响了最终返回的内容。
  */
-export function filterContentByTag(text: string | undefined, tag: string): { closed: boolean; content: string } {
+export function filterContentByTag(
+  text: string | undefined,
+  tag: string
+): { closed: boolean; content: string; hasPartialOpenTag: boolean } {
   // 确保处理 undefined 或空字符串的情况
   if (!text) {
-    return { closed: false, content: '' };
+    return { closed: false, content: '', hasPartialOpenTag: false };
   }
 
   const openTag = `<${tag}>`;
   const closeTag = `</${tag}>`;
 
   // 1. 检查是否存在完整的标签对
+  //    我们寻找最后一个开标签，以及它之后最近的闭合标签，以处理嵌套或多个同名标签的情况。
   const lastOpenTagIndex = text.lastIndexOf(openTag);
   if (lastOpenTagIndex !== -1) {
     const firstCloseTagIndexAfterLastOpen = text.indexOf(closeTag, lastOpenTagIndex + openTag.length);
     if (firstCloseTagIndexAfterLastOpen !== -1) {
-      // 找到了完整的标签对，返回 true 和标签内的内容
+      // 找到了完整的标签对
       return {
         closed: true,
-        content: text.substring(lastOpenTagIndex + openTag.length, firstCloseTagIndexAfterLastOpen)
+        content: text.substring(lastOpenTagIndex + openTag.length, firstCloseTagIndexAfterLastOpen),
+        hasPartialOpenTag: true,
       };
     }
   }
 
   // 2. 如果没有找到完整的标签对，则按照原始逻辑进行内容过滤
   let currentContent = text;
+  let determinedHasPartialOpenTag = false;
 
   // 如果字符串末尾匹配部分结束标签，则删除该部分
+  // 这个操作本身不意味着我们找到了一个“部分开始标签”，所以不在这里设置 determinedHasPartialOpenTag
   for (let i = closeTag.length; i >= 1; i--) {
     const partialEndTag = closeTag.substring(0, i);
     if (currentContent.endsWith(partialEndTag)) {
@@ -43,31 +51,40 @@ export function filterContentByTag(text: string | undefined, tag: string): { clo
     }
   }
 
-  // 检查是否存在完整的开标签（在处理完部分闭合标签之后）
+  // 检查是否存在完整的开标签（在处理完部分闭合标签之后的内容中）
+  // 这个开标签没有对应的闭合标签（否则会在步骤1中处理掉）
   const lastCompleteOpenTagIndexInCurrent = currentContent.lastIndexOf(openTag);
   if (lastCompleteOpenTagIndexInCurrent !== -1) {
-    // 此时虽然有开标签，但没有完整闭合，所以认为是部分匹配
+    // 找到了一个完整的开标签，但没有闭合它。内容是这个开标签之后的部分。
+    determinedHasPartialOpenTag = true;
     return {
       closed: false,
-      content: currentContent.substring(lastCompleteOpenTagIndexInCurrent + openTag.length)
+      content: currentContent.substring(lastCompleteOpenTagIndexInCurrent + openTag.length),
+      hasPartialOpenTag: determinedHasPartialOpenTag,
     };
   } else {
-    // 检查是否存在部分开标签
+    // 没有找到完整的开标签，现在检查是否存在部分开标签在字符串末尾
     for (let i = openTag.length - 1; i >= 1; i--) {
       const partialOpenTag = openTag.substring(0, i);
       if (currentContent.endsWith(partialOpenTag)) {
+        // 找到了部分开标签，内容是该部分之前的内容
+        determinedHasPartialOpenTag = true;
         return {
           closed: false,
-          content: currentContent.substring(0, currentContent.length - partialOpenTag.length)
+          content: currentContent.substring(0, currentContent.length - partialOpenTag.length),
+          hasPartialOpenTag: determinedHasPartialOpenTag,
         };
       }
     }
   }
 
-  // 3. 如果没有找到任何标签或部分标签，返回原始内容
+  // 3. 如果没有找到任何影响内容的开标签（完整的或部分的在末尾），
+  //    返回当前处理过的内容（可能已去除部分闭合标签）。
+  //    此时 determinedHasPartialOpenTag 仍然是 false。
   return {
     closed: false,
-    content: currentContent
+    content: currentContent,
+    hasPartialOpenTag: determinedHasPartialOpenTag,
   };
 }
 
@@ -80,15 +97,13 @@ export function filterContentByTag(text: string | undefined, tag: string): { clo
  */
 export function createThrottledStreamGenerator<T extends (messages: any[], callbacks: StreamCallbacks, options?: any) => Promise<any>>(
   generateStreamFn: T,
-  throttleInterval: number = 200
+  throttleInterval: number = 100
 ) {
   return async function(messages: any[], callbacks: StreamCallbacks, options?: any): Promise<ReturnType<T>> {
     // 创建节流版本的 onContent 回调
     let lastCallTime = 0;
-    let scheduledCall: NodeJS.Timeout | null = null;
     let latestThought: string = '';
     let latestAnswer: string = '';
-    let isClosed = false;
 
     // 节流处理函数
     const throttledOnContent = (thought: string, answer: string) => {
@@ -97,18 +112,8 @@ export function createThrottledStreamGenerator<T extends (messages: any[], callb
 
       const now = Date.now();
       
-      // 如果已经关闭或者距离上次调用时间不足，则延迟调用
-      if (isClosed || now - lastCallTime < throttleInterval) {
-        if (scheduledCall === null) {
-          scheduledCall = setTimeout(() => {
-            // 只有在未关闭的情况下才执行回调
-            if (!isClosed) {
-              callbacks.onContent(latestThought, latestAnswer);
-              lastCallTime = Date.now();
-            }
-            scheduledCall = null;
-          }, Math.max(0, throttleInterval - (now - lastCallTime)));
-        }
+      // 如果距离上次调用时间不足，则延迟调用
+      if (now - lastCallTime < throttleInterval) {
         return;
       }
 
@@ -122,17 +127,8 @@ export function createThrottledStreamGenerator<T extends (messages: any[], callb
       ...callbacks,
       onContent: throttledOnContent,
       onComplete: callbacks.onComplete ? (thought: string, answer: string) => {
-        // 标记为已关闭，取消任何待处理的节流调用
-        isClosed = true;
-        if (scheduledCall !== null) {
-          clearTimeout(scheduledCall);
-          scheduledCall = null;
-        }
-
-        // 确保最后一次调用回调中包含最新的内容
-        if (latestThought !== thought || latestAnswer !== answer) {
-          callbacks.onContent(thought, answer);
-        }
+        // 最后一次 onContent 回调中包含最新的内容
+        callbacks.onContent(thought, answer);
 
         // 调用原始 onComplete 回调
         callbacks.onComplete!(thought, answer);
@@ -142,4 +138,15 @@ export function createThrottledStreamGenerator<T extends (messages: any[], callb
     // 用修改后的回调调用原始函数
     return generateStreamFn(messages, throttledCallbacks, options);
   };
+}
+
+/**
+ * 如果字符串为空或仅包含空格，返回占位字符串。
+ *
+ * @param text 输入字符串。
+ * @param placeholder 占位字符串，默认为 "..."。
+ * @returns 如果字符串为空或仅包含空格，返回占位字符串，否则返回原字符串。
+ */
+export function getPlaceholderIfEmpty(text: string, placeholder: string = '...'): string {
+  return text.trim() === '' ? placeholder : text;
 }

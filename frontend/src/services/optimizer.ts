@@ -6,7 +6,11 @@ import {
 import { TestCase, TestMode } from '@/types/optimization';
 import { ModelProvider, ModelMessage } from '@/types/model';
 import { OperationCancelledError } from '@/errors/OperationCancelledError';
-import { filterContentByTag, createThrottledStreamGenerator } from '@/utils/streamingUtils';
+import { 
+  filterContentByTag,
+  createThrottledStreamGenerator,
+  getPlaceholderIfEmpty
+} from '@/utils/streamingUtils';
 
 export interface InputTestResult {
   input: string;
@@ -351,10 +355,10 @@ export async function summarizeEvaluation({
     {
       onContent: (thought, answer) => {
         if (!answer) {
-          fullContent = `<思考中> ${thought || '...'}`;
+          fullContent = `<思考中> ${getPlaceholderIfEmpty(thought)}`;
         } else {
           const { content } = filterContentByTag(answer, 'Summary');
-          fullContent = content;
+          fullContent = getPlaceholderIfEmpty(content);
         }
         onProgress(fullContent.trim());
       },
@@ -452,21 +456,21 @@ export async function optimizePrompt({
     messages,
     {
       onContent: (thought, answer) => {
-        const { closed: isPromptClosed, content: promptContent } = filterContentByTag(answer, 'Prompt');
+        const { closed: isPromptClosed, content: promptContent, hasPartialOpenTag } = filterContentByTag(answer, 'Prompt');
         if (thought) {
           // 推理模型，返回thought
           if (!answer) {
-            fullContent = `<思考中> \n${thought}`;
+            fullContent = `<思考中> \n${getPlaceholderIfEmpty(thought)}`;
           } else {
-            fullContent = promptContent;
+            fullContent = getPlaceholderIfEmpty(promptContent);
           }
         } else {
           // 非推理模型，从thinking标签提取思考内容
           const { closed: isThinkingClosed, content: thinkingContent } = filterContentByTag(answer, 'Thinking');
-          if (!isThinkingClosed && !isPromptClosed) {
-            fullContent = `<思考中> \n${thinkingContent}`;
+          if (!isThinkingClosed && !isPromptClosed && !hasPartialOpenTag) {
+            fullContent = `<思考中> \n${getPlaceholderIfEmpty(thinkingContent)}`;
           } else {
-            fullContent = promptContent;
+            fullContent = getPlaceholderIfEmpty(promptContent);
           }
         }
         
