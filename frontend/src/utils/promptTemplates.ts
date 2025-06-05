@@ -271,9 +271,9 @@ ${userFeedback ? `\n用户反馈：\n${userFeedback}` : ''}`;
   console.log(userMessage)
 
   return reasoning ? [
+    { role: 'user', content: `${systemMessage}\n${userMessage}` }
+  ] : [
     { role: 'system', content: systemMessage },
     { role: 'user', content: userMessage }
-  ] : [
-    { role: 'user', content: `${systemMessage}\n${userMessage}` }
   ];
 } 

@@ -386,7 +386,7 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content maxW="800px" ref={contentRef} mb="10vh">
+          <Dialog.Content maxW="800px" ref={contentRef} mb="5vh">
             <Dialog.Header>
               <Dialog.Title>{isEditing ? '编辑模型' : '添加模型'}</Dialog.Title>
             </Dialog.Header>

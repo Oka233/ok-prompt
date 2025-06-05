@@ -307,8 +307,11 @@ export async function summarizeEvaluation({
     messages,
     {
       onContent: (thought, answer) => {
+        if (!answer.trim() && !thought.trim()) {
+          return;
+        }
         if (!answer) {
-          fullContent = `<思考中> ${getPlaceholderIfEmpty(thought.trim())}`;
+          fullContent = `<思考中> \n${getPlaceholderIfEmpty(thought.trim())}`;
         } else {
           const { content } = filterContentByTag(answer, 'Summary');
           fullContent = getPlaceholderIfEmpty(content);
@@ -412,7 +415,10 @@ export async function optimizePrompt({
     {
       onContent: (thought, answer) => {
         const { closed: isPromptClosed, content: promptContent, hasPartialOpenTag } = filterContentByTag(answer, 'Prompt');
-        if (thought) {
+        if (!answer.trim() && !thought.trim()) {
+          return;
+        }
+        if (thought.trim()) {
           // 推理模型，返回thought
           if (!answer) {
             fullContent = `<思考中> \n${getPlaceholderIfEmpty(thought.trim())}`;
