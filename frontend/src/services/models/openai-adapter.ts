@@ -1,37 +1,12 @@
 import { ModelProvider, ModelResponse, ModelMessage, ModelOptions, StreamCallbacks } from '@/types/model';
+import { ModelReasoningType } from '@/types/optimization';
 import OpenAI from 'openai';
 
-// OpenAI客户端实例缓存
-const clientCache = new Map<string, OpenAI>();
-
-/**
- * 获取OpenAI客户端实例
- */
-function getClient(apiKey: string, baseUrl?: string): OpenAI {
-  // 创建缓存键
-  const cacheKey = `${apiKey}:${baseUrl}`;
-  
-  // 检查缓存中是否已有实例
-  if (clientCache.has(cacheKey)) {
-    return clientCache.get(cacheKey)!;
-  }
-  
-  // 创建新实例
-  const client = new OpenAI({
-    apiKey,
-    baseURL: baseUrl || undefined,
-    dangerouslyAllowBrowser: true,
-  });
-  
-  // 缓存实例
-  clientCache.set(cacheKey, client);
-  
-  return client;
-}
 
 export class OpenAIAdapter implements ModelProvider {
   private client: OpenAI;
-  reasoning: boolean;
+  modelReasoningType: ModelReasoningType;
+  enableReasoning: boolean;
   modelName: string;
   baseUrl: string;
 
@@ -39,10 +14,16 @@ export class OpenAIAdapter implements ModelProvider {
     apiKey: string,
     modelName: string,
     baseUrl: string,
-    reasoning: boolean
+    modelReasoningType: ModelReasoningType,
+    enableReasoning: boolean
   ) {
-    this.client = getClient(apiKey, baseUrl);
-    this.reasoning = reasoning;
+    this.client = new OpenAI({
+      apiKey,
+      baseURL: baseUrl,
+      dangerouslyAllowBrowser: true,
+    });
+    this.modelReasoningType = modelReasoningType;
+    this.enableReasoning = enableReasoning;
     this.modelName = modelName;
     this.baseUrl = baseUrl;
   }

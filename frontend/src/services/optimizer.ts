@@ -385,6 +385,7 @@ export async function optimizePrompt({
   }
   
   // 构建优化提示词
+  const useReasoning = model.enableReasoning;
   const messages = generateOptimizationPrompt(
     currentPrompt,
     evaluationSummary,
@@ -393,7 +394,7 @@ export async function optimizePrompt({
     historicalIterations,
     currentResults,
     currentAvgScore,
-    model.reasoning
+    useReasoning
   );
   
   let fullContent = '';

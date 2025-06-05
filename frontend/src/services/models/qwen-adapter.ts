@@ -1,15 +1,28 @@
 import { ModelResponse, ModelMessage, ModelOptions, StreamCallbacks } from '@/types/model';
 import { OpenAIAdapter } from "./openai-adapter";
+import { ModelReasoningType } from '@/types/optimization';
 
 export class QwenAdapter extends OpenAIAdapter {
     constructor(
         apiKey: string,
         modelName: string,
         baseUrl: string,
-        reasoning: boolean
+        modelReasoningType: ModelReasoningType,
+        enableReasoning: boolean
     ) {
-        super(apiKey, modelName, baseUrl, reasoning);
+        super(apiKey, modelName, baseUrl, modelReasoningType, enableReasoning);
     }
+
+    getReasoningParameter(enableReasoning: boolean): object {
+        console.log(this.modelReasoningType)
+        if ([ModelReasoningType.NON_REASONING, ModelReasoningType.REASONING].includes(this.modelReasoningType)) {
+            return {};
+        }
+        return {
+            enable_thinking: enableReasoning,
+        }
+    }
+
 
     async generateCompletion(
         messages: ModelMessage[],
@@ -17,7 +30,7 @@ export class QwenAdapter extends OpenAIAdapter {
     ): Promise<ModelResponse> {
         options = {
             ...options,
-            enable_thinking: false,
+            ...this.getReasoningParameter(false),
         }
         const response = await super.generateCompletion(messages, options);
         return response;
@@ -30,7 +43,7 @@ export class QwenAdapter extends OpenAIAdapter {
     ): Promise<void> {
         options = {
             ...options,
-            enable_thinking: this.reasoning,
+            ...this.getReasoningParameter(this.enableReasoning),
         }
         const response = await super.generateCompletionStream(messages, callbacks, options);
         return response;

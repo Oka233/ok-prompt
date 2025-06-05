@@ -1,52 +1,43 @@
 import { ModelProvider, ModelMessage, ModelResponse, ModelOptions, StreamCallbacks } from '@/types/model';
 import { GoogleGenAI } from '@google/genai';
-
-// Google客户端实例缓存
-const clientCache = new Map<string, GoogleGenAI>();
-
-/**
- * 获取Google客户端实例
- */
-function getClient(apiKey: string, baseUrl: string): GoogleGenAI {
-  // 创建缓存键，将 baseUrl 包含在内
-  const cacheKey = `${apiKey}:${baseUrl || ''}`;
-
-  // 检查缓存中是否已有实例
-  if (clientCache.has(cacheKey)) {
-    return clientCache.get(cacheKey)!;
-  }
-
-  let httpOptions: any = {};
-  if (baseUrl) {
-    httpOptions = {
-      baseUrl
-    }
-  }
-
-  // 创建新实例
-  const client = new GoogleGenAI({
-    apiKey,
-    httpOptions
-  });
-  
-  // 缓存实例
-  clientCache.set(cacheKey, client);
-  
-  return client;
-}
+import { ModelReasoningType } from '@/types/optimization';
 
 export class GoogleAdapter implements ModelProvider {
   private client: GoogleGenAI;
-  reasoning: boolean;
+  modelReasoningType: ModelReasoningType;
+  enableReasoning: boolean;
 
   constructor(
     private apiKey: string,
     private modelName: string,
     private baseUrl: string,
-    reasoning: boolean
+    modelReasoningType: ModelReasoningType,
+    enableReasoning: boolean
   ) {
-    this.client = getClient(apiKey, baseUrl);
-    this.reasoning = reasoning;
+    this.client = new GoogleGenAI({
+      apiKey,
+      ...(baseUrl ? { httpOptions: { baseUrl } } : {})
+    });
+    this.modelReasoningType = modelReasoningType;
+    this.enableReasoning = enableReasoning;
+  }
+
+  getReasoningParameter(enableReasoning: boolean): object {
+    if (this.modelReasoningType === ModelReasoningType.NON_REASONING) {
+      return {};
+    }
+
+    const para = {
+      thinkingConfig: {
+        includeThoughts: true,
+      }
+    } as any;
+
+    if (this.modelReasoningType === ModelReasoningType.MIXED && !enableReasoning) {
+      para.thinkingConfig.thinkingBudget = 0;
+    }
+
+    return para;
   }
 
   /**
@@ -101,10 +92,7 @@ export class GoogleAdapter implements ModelProvider {
         contents: geminiContents,
         config: {
           systemInstruction,
-          thinkingConfig: {
-            includeThoughts: true,
-            thinkingBudget: 0, // 非流式调用时，思考预算设置为0
-          },
+          ...this.getReasoningParameter(false),
           ...adaptedOptions,
         },
       });
@@ -157,9 +145,7 @@ export class GoogleAdapter implements ModelProvider {
         contents: geminiContents,
         config: {
           systemInstruction,
-          thinkingConfig: {
-            includeThoughts: true,
-          },
+          ...this.getReasoningParameter(this.enableReasoning),
           ...adaptedOptions,
         },
       });

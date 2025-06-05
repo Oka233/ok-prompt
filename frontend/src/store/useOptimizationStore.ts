@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { OptimizationTask, TestSet, ModelConfig, TestCaseResult, PromptIteration, ModelType } from '@/types/optimization';
+import { OptimizationTask, TestSet, ModelConfig, TestCaseResult, PromptIteration, ModelType, ModelReasoningType } from '@/types/optimization';
 import {
   executeTests,
   evaluateResults,
@@ -87,7 +87,7 @@ interface OptimizationState {
   stopOptimization: (taskId: string) => Promise<void>;
 
   // 模型管理
-  addModel: (name: string, displayName: string, apiKey: string, baseUrl: string, modelType: ModelType, reasoning: boolean) => Promise<void>;
+  addModel: (name: string, displayName: string, apiKey: string, baseUrl: string, modelType: ModelType, modelReasoningType: ModelReasoningType, enableReasoning?: boolean) => Promise<void>;
   updateModel: (id: string, data: Partial<ModelConfig>) => Promise<void>;
   deleteModel: (id: string) => Promise<void>;
 
@@ -803,7 +803,7 @@ export const useOptimizationStore = create<OptimizationState>()(
       },
       
       // 模型管理
-      addModel: async (name, displayName, apiKey, baseUrl, modelType, reasoning = false) => {
+      addModel: async (name, displayName, apiKey, baseUrl, modelType, modelReasoningType, enableReasoning = false) => {
         set({ error: null });
         try {
           const newModel: ModelConfig = {
@@ -813,7 +813,8 @@ export const useOptimizationStore = create<OptimizationState>()(
             apiKey,
             baseUrl,
             modelType,
-            reasoning,
+            modelReasoningType,
+            enableReasoning,
           };
           set(state => ({ 
             models: [...state.models, newModel],

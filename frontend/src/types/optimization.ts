@@ -16,7 +16,15 @@ export enum ModelType {
   OPENAI_COMPATIBLE = 'openai_compatible',
   GEMINI = 'gemini',
   QWEN = 'qwen',
-  DEEPSEEK = 'deepseek'
+  DEEPSEEK = 'deepseek',
+  Claude = 'claude',
+  DOUBAO = 'doubao',
+}
+
+export enum ModelReasoningType {
+  REASONING = 'reasoning',
+  NON_REASONING = 'non_reasoning',
+  MIXED = 'mixed',
 }
 
 // 模型配置类型
@@ -27,7 +35,8 @@ export interface ModelConfig {
   apiKey: string;
   baseUrl: string;
   modelType: ModelType;
-  reasoning: boolean;
+  modelReasoningType: ModelReasoningType;
+  enableReasoning: boolean;
 }
 
 export interface TokenUsage {

@@ -13,12 +13,14 @@ import {
   Select,
   createListCollection,
   Checkbox,
-  Field
+  Field,
+  RadioGroup,
+  HStack
 } from '@chakra-ui/react'
 import { FiSave, FiXCircle } from 'react-icons/fi'
 import { useState, useRef, useEffect } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore'
-import { ModelConfig, ModelType } from '@/types/optimization'
+import { ModelConfig, ModelType, ModelReasoningType } from '@/types/optimization'
 import { toaster } from "@/components/ui/toaster"
 import { providers, ProviderType } from '@/services/models/providers'
 
@@ -27,6 +29,8 @@ import openaiIcon from '@/assets/providers/openai.png'
 import geminiIcon from '@/assets/providers/gemini.png'
 import qwenIcon from '@/assets/providers/qwenlm.png'
 import deepseekIcon from '@/assets/providers/deepseek.png'
+import anthropicIcon from '@/assets/providers/anthropic.png'
+import doubaoIcon from '@/assets/providers/doubao.png'
 
 // 模型类型配置
 const modelTypeOptions = [
@@ -59,6 +63,20 @@ const modelTypeOptions = [
     providerOptions: [
       providers[ProviderType.GOOGLE]
     ]
+  },
+  {
+    value: ModelType.Claude,
+    title: 'Claude',
+    description: 'Anthropic',
+    icon: anthropicIcon,
+    providerOptions: []
+  },
+  {
+    value: ModelType.DOUBAO,
+    title: '豆包',
+    description: '字节跳动',
+    icon: doubaoIcon,
+    providerOptions: []
   },
   {
     value: ModelType.OPENAI,
@@ -110,7 +128,8 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
   // 添加状态变量跟踪用户是否手动编辑过展示名称
   const [isDisplayNameEdited, setIsDisplayNameEdited] = useState(false);
   // 添加推理模型状态
-  const [isReasoning, setIsReasoning] = useState(false);
+  const [selectedReasoningType, setSelectedReasoningType] = useState<ModelReasoningType>(ModelReasoningType.NON_REASONING);
+  const [enableReasoning, setEnableReasoning] = useState(true);
   
   const initialRef = useRef<HTMLInputElement>(null);
   
@@ -158,7 +177,8 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
       setApiKey(currentModel.apiKey);
       setBaseUrl(currentModel.baseUrl);
       setSelectedModelType(currentModel.modelType);
-      setIsReasoning(currentModel.reasoning || false);
+      setSelectedReasoningType(currentModel.modelReasoningType);
+      setEnableReasoning(currentModel.enableReasoning);
       
       // 尝试从baseUrl找到匹配的供应商
       const modelTypeConfig = modelTypeOptions.find(opt => opt.value === currentModel.modelType);
@@ -201,9 +221,9 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
       setSelectedModelType(initialModelType);
       setSelectedProvider(initialSelectedProvider);
       setBaseUrl(initialBaseUrl);
-      
+      setSelectedReasoningType(ModelReasoningType.NON_REASONING);
       setIsDisplayNameEdited(false);
-      setIsReasoning(false);
+      setEnableReasoning(true);
     }
     
     // 重置错误状态
@@ -256,6 +276,7 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
     }
     
     try {
+      const finalEnableReasoning = selectedReasoningType === ModelReasoningType.REASONING ? true : (selectedReasoningType === ModelReasoningType.MIXED ? enableReasoning : false);
       if (isEditing && currentModel) {
         await updateModel(currentModel.id, {
           name: modelName,
@@ -263,7 +284,8 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
           apiKey,
           baseUrl: baseUrl.trim(),
           modelType: selectedModelType,
-          reasoning: isReasoning
+          modelReasoningType: selectedReasoningType,
+          enableReasoning: finalEnableReasoning
         })
         toaster.create({
           title: "更新成功",
@@ -271,7 +293,15 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
           type: "success",
         })
       } else {
-        await addModel(modelName, displayName, apiKey, baseUrl.trim(), selectedModelType, isReasoning)
+        await addModel(
+          modelName, 
+          displayName, 
+          apiKey, 
+          baseUrl.trim(), 
+          selectedModelType, 
+          selectedReasoningType,
+          finalEnableReasoning
+        )
         toaster.create({
           title: "添加成功",
           description: "模型已成功添加",
@@ -339,12 +369,27 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
     }))
   });
 
+  const modelReasoningOptions = [
+    {
+      label: '非推理模型',
+      value: ModelReasoningType.NON_REASONING
+    },
+    {
+      label: '推理模型',
+      value: ModelReasoningType.REASONING
+    },
+    {
+      label: '混合模型',
+      value: ModelReasoningType.MIXED
+    }
+  ]
+
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content maxW="800px" ref={contentRef}>
+          <Dialog.Content maxW="800px" ref={contentRef} mb="10vh">
             <Dialog.Header>
               <Dialog.Title>{isEditing ? '编辑模型' : '添加模型'}</Dialog.Title>
             </Dialog.Header>
@@ -353,8 +398,8 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
               <Flex gap={6}>
                 {/* 左侧模型类型选择 */}
                 <Box width="250px">
-                  <Text mb={2} fontWeight="medium">模型</Text>
-                  <RadioCard.Root value={selectedModelType}>
+                  <Text mb={1} fontWeight="medium">模型</Text>
+                  <RadioCard.Root value={selectedModelType} p={1} maxH={"55vh"} overflow={"auto"}>
                     <VStack align="stretch">
                       {modelTypeOptions.map((item) => (
                         <RadioCard.Item
@@ -417,23 +462,50 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
                     )}
                   </Field.Root>
 
-                  <Field.Root mb={4}>
-                    <Checkbox.Root
-                      checked={isReasoning}
-                      onCheckedChange={(details) => {
-                        setIsReasoning(!!details.checked);
+                  <Field.Root mb={2}>
+                    <Field.Label fontWeight="medium">模型类型</Field.Label>
+                    <RadioGroup.Root 
+                      value={selectedReasoningType}
+                      onValueChange={(details) => {
+                        const value = details.value;
+                        setSelectedReasoningType(value as ModelReasoningType);
                       }}
                     >
-                      <Checkbox.HiddenInput />
-                      <Checkbox.Control />
-                      <Checkbox.Label>推理模型</Checkbox.Label>
-                    </Checkbox.Root>
+                      <HStack gap="6">
+                        {modelReasoningOptions.map((item) => (
+                          <RadioGroup.Item key={item.value} value={item.value}>
+                            <RadioGroup.ItemHiddenInput />
+                            <RadioGroup.ItemIndicator />
+                            <RadioGroup.ItemText>{item.label}</RadioGroup.ItemText>
+                          </RadioGroup.Item>
+                        ))}
+                      </HStack>
+                    </RadioGroup.Root>
                     <Field.HelperText fontSize="xs" color="gray.500">
-                      勾选推理模型/为混合模型启用推理
+                      选择模型类型以启用适配的参数和提示词
                     </Field.HelperText>
                   </Field.Root>
 
-                  <Field.Root mb={4} invalid={!!errors.displayName}>
+                  {/* 只有当选择混合模型时才显示启用推理选项 */}
+                  {selectedReasoningType === ModelReasoningType.MIXED && (
+                    <Field.Root mb={4}>
+                      <Checkbox.Root
+                        checked={enableReasoning}
+                        onCheckedChange={(details) => {
+                          setEnableReasoning(!!details.checked);
+                        }}
+                      >
+                        <Checkbox.HiddenInput />
+                        <Checkbox.Control />
+                        <Checkbox.Label>启用推理</Checkbox.Label>
+                      </Checkbox.Root>
+                      <Field.HelperText fontSize="xs" color="gray.500">
+                        为混合模型启用流式输出时的推理
+                      </Field.HelperText>
+                    </Field.Root>
+                  )}
+
+                  <Field.Root mt={4} mb={4} invalid={!!errors.displayName}>
                     <Field.Label fontWeight="medium">展示名称</Field.Label>
                     <Input
                       placeholder="用于界面显示的名称"

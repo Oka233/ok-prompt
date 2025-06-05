@@ -1,3 +1,5 @@
+import { ModelReasoningType } from "./optimization";
+
 export interface ModelMessage {
   role: 'system' | 'user' | 'assistant' | 'function' | 'tool';
   content: string;
@@ -30,7 +32,8 @@ export interface StreamCallbacks {
 }
 
 export interface ModelProvider {
-  reasoning: boolean;
+  modelReasoningType: ModelReasoningType;
+  enableReasoning: boolean;
   // 非流式调用
   generateCompletion(messages: ModelMessage[], options?: ModelOptions): Promise<ModelResponse>;
   
