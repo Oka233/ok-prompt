@@ -17,7 +17,7 @@ export function generateEvaluationPrompt(
 ): ModelMessage[] {
   // 为不同模式提供不同的系统提示
   let systemPrompt = '';
-  
+
   if (mode === 'strict') {
     systemPrompt = `
 请评估以下任务的完成质量。
@@ -79,7 +79,7 @@ ${actualOutput}
 
   return [
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt }
+    { role: 'user', content: userPrompt },
   ];
 }
 
@@ -93,12 +93,12 @@ export function generateSummaryPrompt(
   perfectScores: number,
   avgScore: number,
   caseDetails: Array<{
-    index: number,
-    input: string,
-    expectedOutput: string,
-    actualOutput: string,
-    score: number,
-    reasoning: string
+    index: number;
+    input: string;
+    expectedOutput: string;
+    actualOutput: string;
+    score: number;
+    reasoning: string;
   }>
 ): ModelMessage[] {
   const systemPrompt = `
@@ -144,7 +144,7 @@ ${caseDetail.reasoning}
 
   return [
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt }
+    { role: 'user', content: userPrompt },
   ];
 }
 
@@ -157,18 +157,18 @@ export function generateOptimizationPrompt(
   mode: string,
   userFeedback?: string,
   historicalIterations?: Array<{
-    iteration: number,
-    prompt: string,
-    avgScore: number | null,
-    summary: string,
-    userFeedback?: string
+    iteration: number;
+    prompt: string;
+    avgScore: number | null;
+    summary: string;
+    userFeedback?: string;
   }>,
   currentResults?: Array<{
-    input: string,
-    expectedOutput: string,
-    actualOutput: string,
-    score: number | null,
-    comment: string | null
+    input: string;
+    expectedOutput: string;
+    actualOutput: string;
+    score: number | null;
+    comment: string | null;
   }>,
   currentAvgScore?: number | null,
   reasoning?: boolean
@@ -180,10 +180,10 @@ export function generateOptimizationPrompt(
 <Prompt>
 优化后的新提示词内容
 </Prompt>
-`
+`;
 
   let userMessage = '';
-  
+
   historicalIterations?.forEach((iter, index) => {
     if (index > 0) {
       // 对上轮测试生成的优化提示词
@@ -204,7 +204,7 @@ ${iter.summary}
 ${iter.userFeedback ? `用户反馈：\n${iter.userFeedback}` : ''}
 
 ---
-`
+`;
     } else {
       // 初始提示词结果
       userMessage += `
@@ -221,9 +221,9 @@ ${iter.summary}
 \`\`\`
 ${iter.userFeedback ? `\n用户反馈：\n${iter.userFeedback}` : ''}
 
----`
+---`;
     }
-  })
+  });
 
   userMessage += `
 最新版本提示词：
@@ -235,11 +235,11 @@ ${currentPrompt}
   // 添加当前轮次的测试用例结果
   if (currentResults && currentResults.length > 0) {
     userMessage += `\n测试用例结果：\n`;
-    
+
     for (let i = 0; i < currentResults.length; i++) {
       const result = currentResults[i];
       userMessage += `
-用例 #${i+1}:
+用例 #${i + 1}:
 - 输入:
 \`\`\`
 ${result.input}
@@ -267,13 +267,13 @@ ${evaluationSummary}
 \`\`\`
 ${userFeedback ? `\n用户反馈：\n${userFeedback}` : ''}`;
 
-  console.log(systemMessage)
-  console.log(userMessage)
+  console.log(systemMessage);
+  console.log(userMessage);
 
-  return reasoning ? [
-    { role: 'user', content: `${systemMessage}\n${userMessage}` }
-  ] : [
-    { role: 'system', content: systemMessage },
-    { role: 'user', content: userMessage }
-  ];
-} 
+  return reasoning
+    ? [{ role: 'user', content: `${systemMessage}\n${userMessage}` }]
+    : [
+        { role: 'system', content: systemMessage },
+        { role: 'user', content: userMessage },
+      ];
+}

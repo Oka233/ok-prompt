@@ -1,15 +1,15 @@
-import { 
-  generateEvaluationPrompt, 
-  generateSummaryPrompt, 
-  generateOptimizationPrompt 
+import {
+  generateEvaluationPrompt,
+  generateSummaryPrompt,
+  generateOptimizationPrompt,
 } from '@/utils/promptTemplates';
 import { TestCase, TestMode } from '@/types/optimization';
 import { ModelProvider, ModelMessage } from '@/types/model';
 import { OperationCancelledError } from '@/errors/OperationCancelledError';
-import { 
+import {
   filterContentByTag,
   createThrottledStreamGenerator,
-  getPlaceholderIfEmpty
+  getPlaceholderIfEmpty,
 } from '@/utils/streamingUtils';
 
 export interface InputTestResult {
@@ -64,15 +64,15 @@ export async function concurrentExecutor<T>(
 ): Promise<T[]> {
   const results: (T | undefined)[] = new Array(tasks.length).fill(undefined);
   const pendingIndices = tasks.map((_, i) => i);
-  
+
   // 使用信号量控制并发
   const activePromises: Map<number, Promise<void>> = new Map();
-  
+
   const executeTask = async (index: number) => {
     if (isCancelled?.()) {
       throw new OperationCancelledError(`任务已被取消，跳过索引 #${index}`);
     }
-    
+
     const result = await tasks[index](index);
     results[index] = result;
     onTaskComplete?.(result, index);
@@ -83,7 +83,7 @@ export async function concurrentExecutor<T>(
     // 填充并发槽位
     while (activePromises.size < concurrentLimit && pendingIndices.length > 0) {
       const index = pendingIndices.shift()!;
-      const promise = executeTask(index)
+      const promise = executeTask(index);
       activePromises.set(index, promise);
     }
 
@@ -95,7 +95,7 @@ export async function concurrentExecutor<T>(
 
   // 等待所有剩余任务完成
   await Promise.all(activePromises.values());
-  
+
   return results as T[];
 }
 
@@ -109,7 +109,7 @@ export async function executeTests({
   isCancelled,
   concurrentLimit = 3,
   onSingleTestComplete,
-  modelOptions = {}
+  modelOptions = {},
 }: {
   prompt: string;
   testCases: TestCase[];
@@ -127,11 +127,11 @@ export async function executeTests({
   const tasks = testCases.map((testCase, index) => async () => {
     const messages: ModelMessage[] = [
       { role: 'system', content: prompt },
-      { role: 'user', content: testCase.input }
+      { role: 'user', content: testCase.input },
     ];
 
     const response = await model.generateCompletion(messages, { ...modelOptions });
-    
+
     return {
       index,
       input: testCase.input,
@@ -141,16 +141,11 @@ export async function executeTests({
         promptTokens: response.usage.promptTokens,
         completionTokens: response.usage.completionTokens,
         totalTokens: response.usage.totalTokens,
-      }
+      },
     };
   });
 
-  return concurrentExecutor(
-    tasks,
-    concurrentLimit,
-    isCancelled,
-    onSingleTestComplete
-  );
+  return concurrentExecutor(tasks, concurrentLimit, isCancelled, onSingleTestComplete);
 }
 
 /**
@@ -172,14 +167,14 @@ export async function evaluateResults({
   isCancelled?: () => boolean; // 用于检查任务是否被取消
   concurrentLimit?: number; // 并发限制
   onSingleEvaluationComplete?: (result: EvaluationResult, index: number) => void; // 单个评估完成的回调
-}): Promise<{ evaluatedResults: EvaluationResult[], avgScore: number }> {
+}): Promise<{ evaluatedResults: EvaluationResult[]; avgScore: number }> {
   const tasks = testResults.map((result, index) => async () => {
     // 严格模式快速路径
     if (testMode === 'strict' && result.actualOutput === result.expectedOutput) {
       return {
         score: 5,
         comment: '输出完全匹配',
-        tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+        tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
       };
     }
 
@@ -193,7 +188,7 @@ export async function evaluateResults({
 
     const response = await model.generateCompletion(messages);
     const { score, reasoning } = parseEvaluationResponse(response.answer);
-    
+
     return {
       score,
       comment: reasoning,
@@ -201,7 +196,7 @@ export async function evaluateResults({
         promptTokens: response.usage.promptTokens,
         completionTokens: response.usage.completionTokens,
         totalTokens: response.usage.totalTokens,
-      }
+      },
     };
   });
 
@@ -213,9 +208,8 @@ export async function evaluateResults({
   );
 
   // 计算平均分（不变）
-  const avgScore = evaluatedResults.reduce(
-    (sum, res) => sum + res.score, 0
-  ) / evaluatedResults.length;
+  const avgScore =
+    evaluatedResults.reduce((sum, res) => sum + res.score, 0) / evaluatedResults.length;
 
   return { evaluatedResults, avgScore };
 }
@@ -228,7 +222,7 @@ function parseEvaluationResponse(response: string): { score: number; reasoning: 
   const scoreMatch = response.match(/<Score>(.*?)<\/Score>/s);
   // 从<Reason>标签中提取评估理由
   const reasonMatch = response.match(/<Reason>(.*?)<\/Reason>/s);
-  
+
   if (!scoreMatch || !scoreMatch[1]) {
     throw new Error('无法获取分数');
   }
@@ -270,12 +264,12 @@ export async function summarizeEvaluation({
   const scores = testResults.map(res => res.score || 0); // 处理null值
   const avgScore = scores.reduce((sum, score) => sum + score, 0) / totalCases;
   const perfectScores = scores.filter(score => score === 5).length;
-  
+
   // 在LLM调用前检查是否需要取消
   if (isCancelled && isCancelled()) {
     throw new OperationCancelledError(`[summarizeEvaluation] 任务已被取消，跳过评估总结`);
   }
-  
+
   // 构建总结提示词
   const messages = generateSummaryPrompt(
     prompt,
@@ -289,51 +283,51 @@ export async function summarizeEvaluation({
       expectedOutput: res.expectedOutput,
       actualOutput: res.actualOutput,
       score: res.score || 0, // 处理null值
-      reasoning: res.comment || '' // 处理null值
+      reasoning: res.comment || '', // 处理null值
     }))
   );
-  
+
   let fullContent = '';
   let tokenUsage = {
     promptTokens: 0,
     completionTokens: 0,
-    totalTokens: 0
+    totalTokens: 0,
   };
-  
+
   // 使用节流后的流式API
-  const throttledGenerateStream = createThrottledStreamGenerator(model.generateCompletionStream.bind(model), 200);
-  
-  await throttledGenerateStream(
-    messages,
-    {
-      onContent: (thought, answer) => {
-        if (!answer.trim() && !thought.trim()) {
-          return;
-        }
-        if (!answer) {
-          fullContent = `<思考中> \n${getPlaceholderIfEmpty(thought.trim())}`;
-        } else {
-          const { content } = filterContentByTag(answer, 'Summary');
-          fullContent = getPlaceholderIfEmpty(content);
-        }
-        fullContent = fullContent.trim();
-        onProgress(fullContent);
-      },
-      onUsage: (usage) => {
-        tokenUsage = usage;
-      },
-      onComplete: (thought, answer) => {
-        // 完成时的处理（可选）
-      }
-    }
+  const throttledGenerateStream = createThrottledStreamGenerator(
+    model.generateCompletionStream.bind(model),
+    200
   );
-  
+
+  await throttledGenerateStream(messages, {
+    onContent: (thought, answer) => {
+      if (!answer.trim() && !thought.trim()) {
+        return;
+      }
+      if (!answer) {
+        fullContent = `<思考中> \n${getPlaceholderIfEmpty(thought.trim())}`;
+      } else {
+        const { content } = filterContentByTag(answer, 'Summary');
+        fullContent = getPlaceholderIfEmpty(content);
+      }
+      fullContent = fullContent.trim();
+      onProgress(fullContent);
+    },
+    onUsage: usage => {
+      tokenUsage = usage;
+    },
+    onComplete: (thought, answer) => {
+      // 完成时的处理（可选）
+    },
+  });
+
   return {
     avgScore,
     perfectScoreCount: perfectScores,
     totalCases,
     summaryReport: fullContent,
-    tokenUsage
+    tokenUsage,
   };
 }
 
@@ -360,18 +354,18 @@ export async function optimizePrompt({
   onProgress: (partialPrompt: string) => void; // 现在是必需参数
   isCancelled?: () => boolean;
   historicalIterations?: Array<{
-    iteration: number,
-    prompt: string,
-    avgScore: number | null,
-    summary: string,
-    userFeedback?: string
+    iteration: number;
+    prompt: string;
+    avgScore: number | null;
+    summary: string;
+    userFeedback?: string;
   }>;
   currentResults?: Array<{
-    input: string,
-    expectedOutput: string,
-    actualOutput: string,
-    score: number | null,
-    comment: string | null
+    input: string;
+    expectedOutput: string;
+    actualOutput: string;
+    score: number | null;
+    comment: string | null;
   }>;
   currentAvgScore?: number | null;
 }): Promise<{
@@ -386,7 +380,7 @@ export async function optimizePrompt({
   if (isCancelled && isCancelled()) {
     throw new OperationCancelledError(`[optimizePrompt] 任务已被取消，跳过提示词优化`);
   }
-  
+
   // 构建优化提示词
   const useReasoning = model.enableReasoning;
   const messages = generateOptimizationPrompt(
@@ -399,55 +393,62 @@ export async function optimizePrompt({
     currentAvgScore,
     useReasoning
   );
-  
+
   let fullContent = '';
   let tokenUsage = {
     promptTokens: 0,
     completionTokens: 0,
-    totalTokens: 0
+    totalTokens: 0,
   };
-  
+
   // 使用节流后的流式API
-  const throttledGenerateStream = createThrottledStreamGenerator(model.generateCompletionStream.bind(model), 200);
-  
-  await throttledGenerateStream(
-    messages,
-    {
-      onContent: (thought, answer) => {
-        const { closed: isPromptClosed, content: promptContent, hasPartialOpenTag } = filterContentByTag(answer, 'Prompt');
-        if (!answer.trim() && !thought.trim()) {
-          return;
-        }
-        if (thought.trim()) {
-          // 推理模型，返回thought
-          if (!answer) {
-            fullContent = `<思考中> \n${getPlaceholderIfEmpty(thought.trim())}`;
-          } else {
-            fullContent = getPlaceholderIfEmpty(promptContent);
-          }
-        } else {
-          // 非推理模型，从thinking标签提取思考内容
-          const { closed: isThinkingClosed, content: thinkingContent } = filterContentByTag(answer, 'Thinking');
-          if (!isThinkingClosed && !isPromptClosed && !hasPartialOpenTag) {
-            fullContent = `<思考中> \n${getPlaceholderIfEmpty(thinkingContent)}`;
-          } else {
-            fullContent = getPlaceholderIfEmpty(promptContent);
-          }
-        }
-        fullContent = fullContent.trim();
-        onProgress(fullContent);
-      },
-      onUsage: (usage) => {
-        tokenUsage = usage;
-      },
-      onComplete: (thought, answer) => {
-        // 完成时的处理（可选）
-      }
-    }
+  const throttledGenerateStream = createThrottledStreamGenerator(
+    model.generateCompletionStream.bind(model),
+    200
   );
-  
+
+  await throttledGenerateStream(messages, {
+    onContent: (thought, answer) => {
+      const {
+        closed: isPromptClosed,
+        content: promptContent,
+        hasPartialOpenTag,
+      } = filterContentByTag(answer, 'Prompt');
+      if (!answer.trim() && !thought.trim()) {
+        return;
+      }
+      if (thought.trim()) {
+        // 推理模型，返回thought
+        if (!answer) {
+          fullContent = `<思考中> \n${getPlaceholderIfEmpty(thought.trim())}`;
+        } else {
+          fullContent = getPlaceholderIfEmpty(promptContent);
+        }
+      } else {
+        // 非推理模型，从thinking标签提取思考内容
+        const { closed: isThinkingClosed, content: thinkingContent } = filterContentByTag(
+          answer,
+          'Thinking'
+        );
+        if (!isThinkingClosed && !isPromptClosed && !hasPartialOpenTag) {
+          fullContent = `<思考中> \n${getPlaceholderIfEmpty(thinkingContent)}`;
+        } else {
+          fullContent = getPlaceholderIfEmpty(promptContent);
+        }
+      }
+      fullContent = fullContent.trim();
+      onProgress(fullContent);
+    },
+    onUsage: usage => {
+      tokenUsage = usage;
+    },
+    onComplete: (thought, answer) => {
+      // 完成时的处理（可选）
+    },
+  });
+
   return {
     newPrompt: fullContent,
-    tokenUsage
+    tokenUsage,
   };
 }

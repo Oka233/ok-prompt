@@ -8,33 +8,38 @@ import {
   optimizePrompt,
   InputTestResult,
   TestResult,
-  EvaluationResult
+  EvaluationResult,
 } from '@/services/optimizer';
-import { toaster } from "@/components/ui/toaster";
+import { toaster } from '@/components/ui/toaster';
 import { ModelFactory } from '@/services/models/model-factory';
 import { OperationCancelledError } from '@/errors/OperationCancelledError';
 import { useAppStore } from './useAppStore';
 import { useModelStore } from './useModelStore';
 
 // 根据任务ID更新任务
-const updateTask = (state: OptimizationState, taskId: string, updater: (task: OptimizationTask) => Partial<OptimizationTask>) => {
+const updateTask = (
+  state: OptimizationState,
+  taskId: string,
+  updater: (task: OptimizationTask) => Partial<OptimizationTask>
+) => {
   return {
-    tasks: state.tasks.map(t => 
-      t.id === taskId 
-        ? { ...t, ...updater(t as OptimizationTask) } 
-        : t
-    )
+    tasks: state.tasks.map(t =>
+      t.id === taskId ? { ...t, ...updater(t as OptimizationTask) } : t
+    ),
   };
 };
 
 // 根据任务ID和迭代ID更新迭代
-const updateIteration = (state: OptimizationState, taskId: string, iterationId: string, updater: (iteration: PromptIteration) => Partial<PromptIteration>) => {
+const updateIteration = (
+  state: OptimizationState,
+  taskId: string,
+  iterationId: string,
+  updater: (iteration: PromptIteration) => Partial<PromptIteration>
+) => {
   return updateTask(state, taskId, task => ({
-    promptIterations: task.promptIterations.map(iter => 
-      iter.id === iterationId 
-        ? { ...iter, ...updater(iter) } 
-        : iter
-    )
+    promptIterations: task.promptIterations.map(iter =>
+      iter.id === iterationId ? { ...iter, ...updater(iter) } : iter
+    ),
   }));
 };
 
@@ -60,17 +65,41 @@ interface OptimizationState {
   // 基本状态
   tasks: OptimizationTask[];
   currentTaskId: string | null;
-  
+
   // 任务管理
-  createTask: (name: string, testSet: TestSet, initialPrompt: string, maxIterations?: number, tokenBudget?: number, targetModelId?: string, optimizationModelId?: string, requireUserFeedback?: boolean, concurrentCalls?: number) => Promise<void>;
+  createTask: (
+    name: string,
+    testSet: TestSet,
+    initialPrompt: string,
+    maxIterations?: number,
+    tokenBudget?: number,
+    targetModelId?: string,
+    optimizationModelId?: string,
+    requireUserFeedback?: boolean,
+    concurrentCalls?: number
+  ) => Promise<void>;
   loadTasks: () => Promise<void>;
   selectTask: (taskId: string) => void;
   deleteTask: (taskId: string) => Promise<void>;
-  updateTaskModels: (taskId: string, targetModelId?: string, optimizationModelId?: string) => Promise<void>;
+  updateTaskModels: (
+    taskId: string,
+    targetModelId?: string,
+    optimizationModelId?: string
+  ) => Promise<void>;
   updateTaskFeedbackSetting: (taskId: string, requireUserFeedback: boolean) => Promise<void>;
   updateTaskConcurrentCalls: (taskId: string, concurrentCalls: number) => Promise<void>;
-  updateTaskTestConfig: (taskId: string, testConfig: { temperature: number; topP: number; maxTokens: number; enableTemperature: boolean; enableTopP: boolean; enableMaxTokens: boolean }) => Promise<void>;
-  
+  updateTaskTestConfig: (
+    taskId: string,
+    testConfig: {
+      temperature: number;
+      topP: number;
+      maxTokens: number;
+      enableTemperature: boolean;
+      enableTopP: boolean;
+      enableMaxTokens: boolean;
+    }
+  ) => Promise<void>;
+
   // 优化操作
   startOptimization: (taskId: string) => Promise<void>;
   stopOptimization: (taskId: string) => Promise<void>;
@@ -86,15 +115,25 @@ export const useOptimizationStore = create<OptimizationState>()(
     (set, get) => ({
       tasks: [],
       currentTaskId: null,
-      
+
       // 任务管理
-      createTask: async (name, testSet, initialPrompt, maxIterations = 20, tokenBudget, targetModelId, optimizationModelId, requireUserFeedback = false, concurrentCalls = 3) => {
+      createTask: async (
+        name,
+        testSet,
+        initialPrompt,
+        maxIterations = 20,
+        tokenBudget,
+        targetModelId,
+        optimizationModelId,
+        requireUserFeedback = false,
+        concurrentCalls = 3
+      ) => {
         const initialTestCases: TestCaseResult[] = testSet.data.map((tc, index) => ({
           id: crypto.randomUUID(),
           index: index + 1,
           input: tc.input,
           expectedOutput: tc.output,
-          iterationResults: [] 
+          iterationResults: [],
         }));
 
         const initialPromptIteration: PromptIteration = {
@@ -104,7 +143,7 @@ export const useOptimizationStore = create<OptimizationState>()(
           avgScore: null,
           reportSummary: '尚未生成',
           waitingForFeedback: requireUserFeedback,
-          stage: 'generated'
+          stage: 'generated',
         };
 
         const newTask: OptimizationTask = {
@@ -118,12 +157,12 @@ export const useOptimizationStore = create<OptimizationState>()(
           targetModelTokenUsage: {
             promptTokens: 0,
             completionTokens: 0,
-            totalTokens: 0
+            totalTokens: 0,
           },
           optimizationModelTokenUsage: {
             promptTokens: 0,
             completionTokens: 0,
-            totalTokens: 0
+            totalTokens: 0,
           },
           targetModelId,
           optimizationModelId,
@@ -137,19 +176,19 @@ export const useOptimizationStore = create<OptimizationState>()(
             maxTokens: 2048,
             enableTemperature: false,
             enableTopP: false,
-            enableMaxTokens: false
-          }
+            enableMaxTokens: false,
+          },
         };
-        
-        set(state => ({ 
+
+        set(state => ({
           tasks: [newTask, ...state.tasks],
           currentTaskId: newTask.id,
         }));
-        
+
         // 使用AppStore更新视图状态
         useAppStore.getState().setViewState('task_view');
       },
-      
+
       loadTasks: async () => {
         const tasks = get().tasks;
         if (tasks.length > 0 && !get().currentTaskId) {
@@ -159,32 +198,36 @@ export const useOptimizationStore = create<OptimizationState>()(
           });
         }
       },
-      
-      selectTask: (taskId) => {
+
+      selectTask: taskId => {
         const task = get().tasks.find(t => t.id === taskId);
-        set({ 
+        set({
           currentTaskId: task ? taskId : null,
         });
-        
+
         // 使用AppStore更新视图状态
         useAppStore.getState().setViewState(task ? 'task_view' : 'upload');
-        
+
         if (!task) {
           console.warn(`选择任务失败: 未找到ID为 ${taskId} 的任务`);
         }
       },
-      
-      deleteTask: async (taskId) => {
+
+      deleteTask: async taskId => {
         set(state => {
           const newTasks = state.tasks.filter(task => task.id !== taskId);
           const isCurrentDeleted = state.currentTaskId === taskId;
-          
+
           return {
             tasks: newTasks,
-            currentTaskId: isCurrentDeleted ? (newTasks.length > 0 ? newTasks[0].id : null) : state.currentTaskId,
+            currentTaskId: isCurrentDeleted
+              ? newTasks.length > 0
+                ? newTasks[0].id
+                : null
+              : state.currentTaskId,
           };
         });
-        
+
         // 如果删除当前任务，更新视图状态
         const updatedState = get();
         if (updatedState.currentTaskId) {
@@ -193,26 +236,26 @@ export const useOptimizationStore = create<OptimizationState>()(
           useAppStore.getState().setViewState('upload');
         }
       },
-      
+
       // 优化操作
-      startOptimization: async (taskId) => {
-        let toasterId : string | undefined = undefined;
+      startOptimization: async taskId => {
+        let toasterId: string | undefined = undefined;
         try {
           // 获取任务信息
           let task = getTask(get(), taskId);
           if (!task) {
             throw new Error(`未找到ID为 ${taskId} 的任务`);
           }
-          
+
           // 从ModelStore获取模型信息
           const modelStore = useModelStore.getState();
-          const targetModel = task.targetModelId 
+          const targetModel = task.targetModelId
             ? modelStore.models.find(m => m.id === task.targetModelId)
             : null;
-          const optimizationModel = task.optimizationModelId 
+          const optimizationModel = task.optimizationModelId
             ? modelStore.models.find(m => m.id === task.optimizationModelId)
             : null;
-          
+
           if (!targetModel || !optimizationModel) {
             throw new Error('请先配置目标模型和优化模型');
           }
@@ -229,8 +272,13 @@ export const useOptimizationStore = create<OptimizationState>()(
           }
 
           // 检查是否达到最大迭代次数
-          if (task.promptIterations.length >= task.maxIterations && task.promptIterations[task.promptIterations.length - 1].stage === 'evaluated') {
-            set(state => updateTask(state, taskId, () => ({ status: 'max_iterations_reached' as const })));
+          if (
+            task.promptIterations.length >= task.maxIterations &&
+            task.promptIterations[task.promptIterations.length - 1].stage === 'evaluated'
+          ) {
+            set(state =>
+              updateTask(state, taskId, () => ({ status: 'max_iterations_reached' as const }))
+            );
             return;
           }
 
@@ -240,25 +288,33 @@ export const useOptimizationStore = create<OptimizationState>()(
               if (isTaskPaused(get(), taskId)) {
                 return;
               }
-              
+
               task = getTask(get(), taskId) as OptimizationTask;
               const latestIteration = task.promptIterations[task.promptIterations.length - 1];
-              const currentIteration = latestIteration.stage !== 'summarized' ? task.promptIterations.length - 1 : task.promptIterations.length;
+              const currentIteration =
+                latestIteration.stage !== 'summarized'
+                  ? task.promptIterations.length - 1
+                  : task.promptIterations.length;
 
-              let currentPromptIteration = latestIteration.stage !== 'summarized' ? latestIteration : {
-                id: crypto.randomUUID(),
-                iteration: currentIteration,
-                prompt: '',
-                avgScore: null,
-                reportSummary: '尚未生成',
-                waitingForFeedback: false,
-                stage: 'not_started'
-              } as PromptIteration;
+              let currentPromptIteration =
+                latestIteration.stage !== 'summarized'
+                  ? latestIteration
+                  : ({
+                      id: crypto.randomUUID(),
+                      iteration: currentIteration,
+                      prompt: '',
+                      avgScore: null,
+                      reportSummary: '尚未生成',
+                      waitingForFeedback: false,
+                      stage: 'not_started',
+                    } as PromptIteration);
 
               if (latestIteration.stage === 'summarized') {
-                set(state => updateTask(state, taskId, task => ({
-                  promptIterations: [...task.promptIterations, currentPromptIteration]
-                })));
+                set(state =>
+                  updateTask(state, taskId, task => ({
+                    promptIterations: [...task.promptIterations, currentPromptIteration],
+                  }))
+                );
               }
 
               if (toasterId) {
@@ -270,8 +326,8 @@ export const useOptimizationStore = create<OptimizationState>()(
                 toasterId = toaster.create({
                   title: `${task.name} - 迭代${currentIteration + 1}优化中`,
                   description: `...`,
-                  type: "loading",
-                })
+                  type: 'loading',
+                });
               }
 
               // 再次检查任务状态
@@ -284,7 +340,6 @@ export const useOptimizationStore = create<OptimizationState>()(
 
               let currentPrompt = currentPromptIteration.prompt;
               if (currentPromptIteration.stage === 'not_started') {
-                
                 toaster.update(toasterId as string, {
                   description: `正在生成提示词`,
                 });
@@ -309,12 +364,17 @@ export const useOptimizationStore = create<OptimizationState>()(
 
                 // 计算当前平均分数
                 const currentScores = evaluatedResults.map(result => result.score || 0);
-                const currentAvgScore = currentScores.length > 0 
-                  ? currentScores.reduce((sum, score) => sum + score, 0) / currentScores.length 
-                  : null;
+                const currentAvgScore =
+                  currentScores.length > 0
+                    ? currentScores.reduce((sum, score) => sum + score, 0) / currentScores.length
+                    : null;
 
                 // 创建一个临时提示词，用于流式更新
-                set(state => updateIteration(state, taskId, currentPromptIteration.id, () => ({ prompt: '...' })));
+                set(state =>
+                  updateIteration(state, taskId, currentPromptIteration.id, () => ({
+                    prompt: '...',
+                  }))
+                );
 
                 const optimizationResult = await optimizePrompt({
                   currentPrompt: previousIteration.prompt,
@@ -325,31 +385,41 @@ export const useOptimizationStore = create<OptimizationState>()(
                   historicalIterations: historicalIterations,
                   currentResults: evaluatedResults,
                   currentAvgScore: currentAvgScore,
-                  onProgress: (partialPrompt) => {
+                  onProgress: partialPrompt => {
                     // 流式更新提示词
-                    set(state => updateIteration(state, taskId, currentPromptIteration.id, () => ({ prompt: partialPrompt })));
+                    set(state =>
+                      updateIteration(state, taskId, currentPromptIteration.id, () => ({
+                        prompt: partialPrompt,
+                      }))
+                    );
                   },
                   isCancelled: () => isTaskPaused(get(), taskId),
                 });
 
                 currentPrompt = optimizationResult.newPrompt;
-                
+
                 // 更新token用量和迭代记录
                 set(state => {
                   const t = getTask(state, taskId) as OptimizationTask;
                   const updatedTokenUsage = {
-                    promptTokens: t.optimizationModelTokenUsage.promptTokens + optimizationResult.tokenUsage.promptTokens,
-                    completionTokens: t.optimizationModelTokenUsage.completionTokens + optimizationResult.tokenUsage.completionTokens,
-                    totalTokens: t.optimizationModelTokenUsage.totalTokens + optimizationResult.tokenUsage.totalTokens
+                    promptTokens:
+                      t.optimizationModelTokenUsage.promptTokens +
+                      optimizationResult.tokenUsage.promptTokens,
+                    completionTokens:
+                      t.optimizationModelTokenUsage.completionTokens +
+                      optimizationResult.tokenUsage.completionTokens,
+                    totalTokens:
+                      t.optimizationModelTokenUsage.totalTokens +
+                      optimizationResult.tokenUsage.totalTokens,
                   };
-                  
+
                   return updateTask(state, taskId, () => ({
                     optimizationModelTokenUsage: updatedTokenUsage,
-                    promptIterations: t.promptIterations.map((iteration, index) => 
-                      index === currentIteration 
+                    promptIterations: t.promptIterations.map((iteration, index) =>
+                      index === currentIteration
                         ? { ...iteration, prompt: currentPrompt, stage: 'generated' as const }
                         : iteration
-                    )
+                    ),
                   }));
                 });
               }
@@ -359,7 +429,9 @@ export const useOptimizationStore = create<OptimizationState>()(
                 return;
               }
 
-              currentPromptIteration = get().tasks.find(t => t.id === taskId)?.promptIterations.find(pi => pi.iteration === currentIteration) as PromptIteration;
+              currentPromptIteration = get()
+                .tasks.find(t => t.id === taskId)
+                ?.promptIterations.find(pi => pi.iteration === currentIteration) as PromptIteration;
               const testResults: InputTestResult[] = task.testCases.map(tc => {
                 if (tc.iterationResults.length > currentIteration) {
                   // 已有结果的用例直接使用
@@ -394,14 +466,18 @@ export const useOptimizationStore = create<OptimizationState>()(
                     set(state => {
                       const t = getTask(state, taskId) as OptimizationTask;
                       const updatedTestCases = [...t.testCases];
-                      
+
                       // 更新总token用量
                       const updatedTokenUsage = {
-                        promptTokens: t.targetModelTokenUsage.promptTokens + result.tokenUsage.promptTokens,
-                        completionTokens: t.targetModelTokenUsage.completionTokens + result.tokenUsage.completionTokens,
-                        totalTokens: t.targetModelTokenUsage.totalTokens + result.tokenUsage.totalTokens
+                        promptTokens:
+                          t.targetModelTokenUsage.promptTokens + result.tokenUsage.promptTokens,
+                        completionTokens:
+                          t.targetModelTokenUsage.completionTokens +
+                          result.tokenUsage.completionTokens,
+                        totalTokens:
+                          t.targetModelTokenUsage.totalTokens + result.tokenUsage.totalTokens,
                       };
-                      
+
                       updatedTestCases[testCaseIndex].iterationResults.push({
                         iteration: currentIteration,
                         output: result.actualOutput,
@@ -425,8 +501,8 @@ export const useOptimizationStore = create<OptimizationState>()(
                     });
 
                     // 更新UI提示
-                    const completedCount = task.testCases.filter(tc => 
-                      tc.iterationResults.length > currentIteration
+                    const completedCount = task.testCases.filter(
+                      tc => tc.iterationResults.length > currentIteration
                     ).length;
                     toaster.update(toasterId as string, {
                       description: `正在推理测试用例结果 (${completedCount}/${task.testCases.length})`,
@@ -450,7 +526,10 @@ export const useOptimizationStore = create<OptimizationState>()(
                 });
 
                 // 修改回调函数，使用映射数组将过滤后的索引映射回原始索引
-                const mappedHandleSingleTestComplete = (result: TestResult, filteredIndex: number) => {
+                const mappedHandleSingleTestComplete = (
+                  result: TestResult,
+                  filteredIndex: number
+                ) => {
                   const originalIndex = indexMapping[filteredIndex];
                   handleSingleTestComplete(result, originalIndex);
                 };
@@ -465,21 +544,25 @@ export const useOptimizationStore = create<OptimizationState>()(
                     concurrentLimit: task.concurrentCalls,
                     onSingleTestComplete: mappedHandleSingleTestComplete,
                     modelOptions: {
-                      ...(task.testConfig.enableTemperature && { temperature: task.testConfig.temperature }),
+                      ...(task.testConfig.enableTemperature && {
+                        temperature: task.testConfig.temperature,
+                      }),
                       ...(task.testConfig.enableTopP && { topP: task.testConfig.topP }),
-                      ...(task.testConfig.enableMaxTokens && { maxTokens: task.testConfig.maxTokens }),
+                      ...(task.testConfig.enableMaxTokens && {
+                        maxTokens: task.testConfig.maxTokens,
+                      }),
                     },
                   });
                 }
 
                 // 确保所有测试用例都有结果
-                set(state => updateTask(state, taskId, () => ({
-                  promptIterations: getTask(state, taskId)!.promptIterations.map(pi =>
-                    pi.iteration === currentIteration
-                      ? { ...pi, stage: 'tested' as const }
-                      : pi
-                  )
-                })));
+                set(state =>
+                  updateTask(state, taskId, () => ({
+                    promptIterations: getTask(state, taskId)!.promptIterations.map(pi =>
+                      pi.iteration === currentIteration ? { ...pi, stage: 'tested' as const } : pi
+                    ),
+                  }))
+                );
               }
 
               // 再次检查任务状态
@@ -487,38 +570,50 @@ export const useOptimizationStore = create<OptimizationState>()(
                 return;
               }
 
-              currentPromptIteration = get().tasks.find(t => t.id === taskId)?.promptIterations.find(pi => pi.iteration === currentIteration) as PromptIteration;
+              currentPromptIteration = get()
+                .tasks.find(t => t.id === taskId)
+                ?.promptIterations.find(pi => pi.iteration === currentIteration) as PromptIteration;
               if (currentPromptIteration.stage === 'tested') {
                 toaster.update(toasterId as string, {
                   description: `正在评估测试用例结果`,
                 });
-                
+
                 // 处理单个评估完成时的回调
-                const handleSingleEvaluationComplete = (result: EvaluationResult, index: number) => {
+                const handleSingleEvaluationComplete = (
+                  result: EvaluationResult,
+                  index: number
+                ) => {
                   const testCaseIndex = index;
                   if (testCaseIndex !== -1 && testCaseIndex < task.testCases.length) {
                     // 每完成一个评估就更新状态
                     set(state => {
                       const t = getTask(state, taskId) as OptimizationTask;
                       const updatedTestCases = [...t.testCases];
-                      
+
                       // 计算这次评估的token用量
                       const evaluationTokenUsage = {
                         promptTokens: result.tokenUsage.promptTokens,
                         completionTokens: result.tokenUsage.completionTokens,
-                        totalTokens: result.tokenUsage.totalTokens
+                        totalTokens: result.tokenUsage.totalTokens,
                       };
-                      
+
                       // 更新总token用量
                       const updatedTokenUsage = {
-                        promptTokens: t.optimizationModelTokenUsage.promptTokens + evaluationTokenUsage.promptTokens,
-                        completionTokens: t.optimizationModelTokenUsage.completionTokens + evaluationTokenUsage.completionTokens,
-                        totalTokens: t.optimizationModelTokenUsage.totalTokens + evaluationTokenUsage.totalTokens
+                        promptTokens:
+                          t.optimizationModelTokenUsage.promptTokens +
+                          evaluationTokenUsage.promptTokens,
+                        completionTokens:
+                          t.optimizationModelTokenUsage.completionTokens +
+                          evaluationTokenUsage.completionTokens,
+                        totalTokens:
+                          t.optimizationModelTokenUsage.totalTokens +
+                          evaluationTokenUsage.totalTokens,
                       };
-                      
+
                       // 更新评估结果
                       if (updatedTestCases[testCaseIndex]) {
-                        const lastResult = updatedTestCases[testCaseIndex].iterationResults[currentIteration];
+                        const lastResult =
+                          updatedTestCases[testCaseIndex].iterationResults[currentIteration];
                         if (lastResult) {
                           lastResult.score = result.score;
                           lastResult.comment = result.comment || '';
@@ -539,19 +634,21 @@ export const useOptimizationStore = create<OptimizationState>()(
                     });
 
                     // 更新UI提示
-                    const completedCount = task.testCases.filter(tc => 
-                      tc.iterationResults[currentIteration]?.score !== null
+                    const completedCount = task.testCases.filter(
+                      tc => tc.iterationResults[currentIteration]?.score !== null
                     ).length;
                     toaster.update(toasterId as string, {
                       description: `正在评估测试用例结果 (${completedCount}/${task.testCases.length})`,
                     });
                   }
                 };
-                
+
                 // 过滤掉已经评估过的测试结果
                 const pendingEvaluations = testResults.filter((result, index) => {
                   const testCase = task.testCases[index];
-                  const iterationResult = testCase.iterationResults.find(r => r.iteration === currentIteration);
+                  const iterationResult = testCase.iterationResults.find(
+                    r => r.iteration === currentIteration
+                  );
                   return iterationResult && iterationResult.score === null;
                 });
 
@@ -559,14 +656,19 @@ export const useOptimizationStore = create<OptimizationState>()(
                 const evaluationIndexMapping: number[] = [];
                 testResults.forEach((result, originalIndex) => {
                   const testCase = task.testCases[originalIndex];
-                  const iterationResult = testCase.iterationResults.find(r => r.iteration === currentIteration);
+                  const iterationResult = testCase.iterationResults.find(
+                    r => r.iteration === currentIteration
+                  );
                   if (iterationResult && iterationResult.score === null) {
                     evaluationIndexMapping.push(originalIndex);
                   }
                 });
 
                 // 修改回调函数
-                const mappedHandleSingleEvaluationComplete = (result: EvaluationResult, filteredIndex: number) => {
+                const mappedHandleSingleEvaluationComplete = (
+                  result: EvaluationResult,
+                  filteredIndex: number
+                ) => {
                   const originalIndex = evaluationIndexMapping[filteredIndex];
                   handleSingleEvaluationComplete(result, originalIndex);
                 };
@@ -581,15 +683,17 @@ export const useOptimizationStore = create<OptimizationState>()(
                   concurrentLimit: task.concurrentCalls,
                   onSingleEvaluationComplete: mappedHandleSingleEvaluationComplete,
                 });
-                
+
                 // 确保所有评估都已完成，并立即更新平均分数
-                set(state => updateTask(state, taskId, () => ({
-                  promptIterations: getTask(state, taskId)!.promptIterations.map(pi =>
-                    pi.iteration === currentIteration
-                      ? { ...pi, stage: 'evaluated' as const, avgScore }
-                    : pi
-                  )
-                })));
+                set(state =>
+                  updateTask(state, taskId, () => ({
+                    promptIterations: getTask(state, taskId)!.promptIterations.map(pi =>
+                      pi.iteration === currentIteration
+                        ? { ...pi, stage: 'evaluated' as const, avgScore }
+                        : pi
+                    ),
+                  }))
+                );
               }
 
               // 再次检查任务状态
@@ -598,30 +702,40 @@ export const useOptimizationStore = create<OptimizationState>()(
               }
 
               // 确保我们有最新的currentPromptIteration
-              currentPromptIteration = get().tasks.find(t => t.id === taskId)?.promptIterations.find(pi => pi.iteration === currentIteration) as PromptIteration;
+              currentPromptIteration = get()
+                .tasks.find(t => t.id === taskId)
+                ?.promptIterations.find(pi => pi.iteration === currentIteration) as PromptIteration;
               if (!currentPromptIteration) {
-                console.error("无法找到当前迭代对象");
+                console.error('无法找到当前迭代对象');
                 return;
               }
 
               toaster.update(toasterId as string, {
                 description: `正在总结评估结果`,
               });
-              
+
               // 创建一个初始的报告状态
-              set(state => updateIteration(state, taskId, currentPromptIteration.id, () => ({ reportSummary: '...' })));
-              
+              set(state =>
+                updateIteration(state, taskId, currentPromptIteration.id, () => ({
+                  reportSummary: '...',
+                }))
+              );
+
               // 显示当前迭代的报告
               get().showSummary(taskId, currentPromptIteration.id);
-              
+
               const summary = await summarizeEvaluation({
                 prompt: currentPrompt,
                 testResults: testResults,
                 testMode: task.testSet.mode,
                 model: optimizationModelInstance,
-                onProgress: (partialSummary) => {
+                onProgress: partialSummary => {
                   // 流式更新评估总结
-                  set(state => updateIteration(state, taskId, currentPromptIteration.id, () => ({ reportSummary: partialSummary })));
+                  set(state =>
+                    updateIteration(state, taskId, currentPromptIteration.id, () => ({
+                      reportSummary: partialSummary,
+                    }))
+                  );
                 },
                 isCancelled: () => isTaskPaused(get(), taskId),
               });
@@ -635,23 +749,27 @@ export const useOptimizationStore = create<OptimizationState>()(
 
                 // 更新token用量
                 const updatedTokenUsage = {
-                  promptTokens: t.optimizationModelTokenUsage.promptTokens + summary.tokenUsage.promptTokens,
-                  completionTokens: t.optimizationModelTokenUsage.completionTokens + summary.tokenUsage.completionTokens,
-                  totalTokens: t.optimizationModelTokenUsage.totalTokens + summary.tokenUsage.totalTokens
+                  promptTokens:
+                    t.optimizationModelTokenUsage.promptTokens + summary.tokenUsage.promptTokens,
+                  completionTokens:
+                    t.optimizationModelTokenUsage.completionTokens +
+                    summary.tokenUsage.completionTokens,
+                  totalTokens:
+                    t.optimizationModelTokenUsage.totalTokens + summary.tokenUsage.totalTokens,
                 };
 
                 return updateTask(state, taskId, () => ({
                   optimizationModelTokenUsage: updatedTokenUsage,
-                  promptIterations: t.promptIterations.map(iteration => 
+                  promptIterations: t.promptIterations.map(iteration =>
                     iteration.iteration === currentIteration
                       ? {
-                        ...iteration,
-                        reportSummary: summary.summaryReport,
-                        stage: 'summarized' as const,
-                        waitingForFeedback: t.requireUserFeedback && !allPerfect,
-                      }
+                          ...iteration,
+                          reportSummary: summary.summaryReport,
+                          stage: 'summarized' as const,
+                          waitingForFeedback: t.requireUserFeedback && !allPerfect,
+                        }
                       : iteration
-                  )
+                  ),
                 }));
               });
 
@@ -663,7 +781,7 @@ export const useOptimizationStore = create<OptimizationState>()(
 
               // 在决定是否继续迭代前，再次获取最新的任务状态
               const updatedTask = getTask(get(), taskId) as OptimizationTask;
-              
+
               // 如果任务已被暂停，则不继续迭代
               if (updatedTask.status === 'paused') {
                 return;
@@ -671,7 +789,7 @@ export const useOptimizationStore = create<OptimizationState>()(
 
               // 更新任务状态
               set(state => updateTask(state, taskId, () => ({ status: 'in_progress' as const })));
-              
+
               // 如果需要用户反馈，则暂停迭代
               if (updatedTask.requireUserFeedback) {
                 set(state => updateTask(state, taskId, () => ({ status: 'paused' as const })));
@@ -680,7 +798,9 @@ export const useOptimizationStore = create<OptimizationState>()(
 
               // 如果达到最大迭代次数，则结束迭代
               if (updatedTask.promptIterations.length >= updatedTask.maxIterations) {
-                set(state => updateTask(state, taskId, () => ({ status: 'max_iterations_reached' as const })));
+                set(state =>
+                  updateTask(state, taskId, () => ({ status: 'max_iterations_reached' as const }))
+                );
                 return;
               }
 
@@ -693,12 +813,12 @@ export const useOptimizationStore = create<OptimizationState>()(
                 set(state => updateTask(state, taskId, () => ({ status: 'paused' as const })));
                 return; // 不再继续迭代
               }
-              
+
               console.error('优化迭代执行失败:', error);
               set(state => ({
-                ...updateTask(state, taskId, () => ({ status: 'paused' as const }))
+                ...updateTask(state, taskId, () => ({ status: 'paused' as const })),
               }));
-              
+
               // 将错误向上抛出，让上层也能处理
               throw error;
             }
@@ -709,23 +829,20 @@ export const useOptimizationStore = create<OptimizationState>()(
         } catch (error) {
           // 处理取消错误
           if (error instanceof OperationCancelledError) {
-            
           } else {
             console.error('开始优化失败:', error);
-            
+
             // 显示详细的错误信息
             toaster.create({
-              title: "优化失败",
+              title: '优化失败',
               description: `发生错误: ${(error as Error).message}`,
-              type: "error",
+              type: 'error',
             });
-            
+
             set(state => ({
-              tasks: state.tasks.map(t => 
-                t.id === taskId 
-                  ? { ...t, status: 'paused' as const }
-                  : t
-              )
+              tasks: state.tasks.map(t =>
+                t.id === taskId ? { ...t, status: 'paused' as const } : t
+              ),
             }));
           }
         } finally {
@@ -734,94 +851,93 @@ export const useOptimizationStore = create<OptimizationState>()(
           }
         }
       },
-      
-      stopOptimization: async (taskId) => {
+
+      stopOptimization: async taskId => {
         set(state => updateTask(state, taskId, () => ({ status: 'paused' as const })));
-        
+
         // 当用户点击停止时，提示用户
         toaster.create({
-          title: "停止优化",
-          description: "当前已发送的请求返回后，任务将停止",
-          type: "default",
+          title: '停止优化',
+          description: '当前已发送的请求返回后，任务将停止',
+          type: 'default',
         });
       },
-      
+
       // 任务模型关联
       updateTaskModels: async (taskId, targetModelId, optimizationModelId) => {
         set(state => ({
-          tasks: state.tasks.map(task => 
-            task.id === taskId 
-              ? { ...task, targetModelId, optimizationModelId }
-              : task
-          )
+          tasks: state.tasks.map(task =>
+            task.id === taskId ? { ...task, targetModelId, optimizationModelId } : task
+          ),
         }));
       },
       updateTaskFeedbackSetting: async (taskId, requireUserFeedback) => {
         set(state => ({
-          tasks: state.tasks.map(task => 
-            task.id === taskId 
-              ? { ...task, requireUserFeedback }
-              : task
-          )
+          tasks: state.tasks.map(task =>
+            task.id === taskId ? { ...task, requireUserFeedback } : task
+          ),
         }));
       },
       updateTaskConcurrentCalls: async (taskId, concurrentCalls) => {
         set(state => ({
-          tasks: state.tasks.map(task => 
-            task.id === taskId 
-              ? { ...task, concurrentCalls }
-              : task
-          )
+          tasks: state.tasks.map(task =>
+            task.id === taskId ? { ...task, concurrentCalls } : task
+          ),
         }));
       },
       updateTaskTestConfig: async (taskId, testConfig) => {
         set(state => ({
-          tasks: state.tasks.map(task => 
-            task.id === taskId 
-              ? { ...task, testConfig: {
-                  temperature: testConfig.temperature,
-                  topP: testConfig.topP,
-                  maxTokens: testConfig.maxTokens,
-                  enableTemperature: testConfig.enableTemperature,
-                  enableTopP: testConfig.enableTopP,
-                  enableMaxTokens: testConfig.enableMaxTokens
-                } }
+          tasks: state.tasks.map(task =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  testConfig: {
+                    temperature: testConfig.temperature,
+                    topP: testConfig.topP,
+                    maxTokens: testConfig.maxTokens,
+                    enableTemperature: testConfig.enableTemperature,
+                    enableTopP: testConfig.enableTopP,
+                    enableMaxTokens: testConfig.enableMaxTokens,
+                  },
+                }
               : task
-          )
+          ),
         }));
       },
 
       submitUserFeedback: async (taskId: string, iterationId: string, feedback: string) => {
-        set(state => updateIteration(state, taskId, iterationId, () => ({
-          userFeedback: feedback,
-          waitingForFeedback: false
-        })));
+        set(state =>
+          updateIteration(state, taskId, iterationId, () => ({
+            userFeedback: feedback,
+            waitingForFeedback: false,
+          }))
+        );
         get().startOptimization(taskId);
       },
-      
+
       closeSummary: (taskId, iterationId) => {
         set(state => updateIteration(state, taskId, iterationId, () => ({ showReport: false })));
       },
-      
+
       showSummary: (taskId, iterationId) => {
         set(state => {
           const task = getTask(state, taskId);
           if (!task) return state;
-          
+
           // 先关闭所有其他报告，再打开当前报告
           return updateTask(state, taskId, task => ({
             promptIterations: task.promptIterations.map(iter => ({
               ...iter,
-              showReport: iter.id === iterationId
-            }))
+              showReport: iter.id === iterationId,
+            })),
           }));
         });
-      }
+      },
     }),
     {
       name: 'optimization-store',
       // 只持久化部分状态
-      partialize: (state) => ({
+      partialize: state => ({
         tasks: state.tasks,
       }),
     }
@@ -832,10 +948,8 @@ export const useOptimizationStore = create<OptimizationState>()(
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     useOptimizationStore.setState(state => {
-      const updatedTasks = state.tasks.map(task => 
-        task.status === 'in_progress' 
-          ? { ...task, status: 'paused' as const } 
-          : task
+      const updatedTasks = state.tasks.map(task =>
+        task.status === 'in_progress' ? { ...task, status: 'paused' as const } : task
       );
       return { tasks: updatedTasks };
     });
@@ -843,16 +957,18 @@ if (typeof window !== 'undefined') {
 }
 
 // 选择器：获取当前任务的测试用例和提示词迭代
-export const useCurrentTestCases = () => useOptimizationStore(state => {
-  const currentTaskId = state.currentTaskId;
-  if (!currentTaskId) return [];
-  const task = state.tasks.find(t => t.id === currentTaskId);
-  return task?.testCases || [];
-});
+export const useCurrentTestCases = () =>
+  useOptimizationStore(state => {
+    const currentTaskId = state.currentTaskId;
+    if (!currentTaskId) return [];
+    const task = state.tasks.find(t => t.id === currentTaskId);
+    return task?.testCases || [];
+  });
 
-export const useCurrentPromptIterations = () => useOptimizationStore(state => {
-  const currentTaskId = state.currentTaskId;
-  if (!currentTaskId) return [];
-  const task = state.tasks.find(t => t.id === currentTaskId);
-  return task?.promptIterations || [];
-});
+export const useCurrentPromptIterations = () =>
+  useOptimizationStore(state => {
+    const currentTaskId = state.currentTaskId;
+    if (!currentTaskId) return [];
+    const task = state.tasks.find(t => t.id === currentTaskId);
+    return task?.promptIterations || [];
+  });

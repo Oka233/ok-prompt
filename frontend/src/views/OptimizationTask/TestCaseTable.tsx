@@ -1,19 +1,19 @@
-import { 
-  Box, 
-  Badge, 
-  Text, 
+import {
+  Box,
+  Badge,
+  Text,
   Flex,
   Table,
   Popover,
   Portal,
   IconButton,
   Clipboard,
-  Spacer
-} from '@chakra-ui/react'
-import { useCurrentTestCases } from '@/store/useOptimizationStore.ts'
+  Spacer,
+} from '@chakra-ui/react';
+import { useCurrentTestCases } from '@/store/useOptimizationStore.ts';
 
 export function TestCaseTable() {
-  const currentTestCases = useCurrentTestCases()
+  const currentTestCases = useCurrentTestCases();
 
   // 计算最大迭代次数，用于确定需要显示多少列
   const maxIterationCount = currentTestCases.reduce((max, testCase) => {
@@ -21,37 +21,37 @@ export function TestCaseTable() {
   }, 0);
 
   const renderScoreBadge = (score: number) => {
-    let textColor = "white";
-    let bgColor = "gray.500";
-    
-    switch(score) {
+    let textColor = 'white';
+    let bgColor = 'gray.500';
+
+    switch (score) {
       case 5:
-        bgColor = "green.500";
+        bgColor = 'green.500';
         break;
       case 4:
-        bgColor = "green.400";
-        textColor = "white";
+        bgColor = 'green.400';
+        textColor = 'white';
         break;
       case 3:
-        bgColor = "orange.400";
-        textColor = "white";
+        bgColor = 'orange.400';
+        textColor = 'white';
         break;
       case 2:
-        bgColor = "red.400";
-        textColor = "white";
+        bgColor = 'red.400';
+        textColor = 'white';
         break;
       case 1:
-        bgColor = "red.500";
+        bgColor = 'red.500';
         break;
     }
-    
+
     return (
       <Flex alignItems="center">
-        <Badge 
-          px={2} 
-          py={1} 
-          borderRadius="md" 
-          fontSize="xs" 
+        <Badge
+          px={2}
+          py={1}
+          borderRadius="md"
+          fontSize="xs"
           fontWeight="bold"
           color={textColor}
           bg={bgColor}
@@ -59,20 +59,22 @@ export function TestCaseTable() {
           {score}
         </Badge>
       </Flex>
-    )
-  }
+    );
+  };
 
   // 动态生成表头
   const renderTableHeader = () => {
     const iterationHeaders = [];
-    
+
     for (let i = 0; i < maxIterationCount; i++) {
-      const label = i === 0 ? "初始提示词结果" : `迭代 ${i} 结果`;
+      const label = i === 0 ? '初始提示词结果' : `迭代 ${i} 结果`;
       iterationHeaders.push(
-        <Table.ColumnHeader key={`iteration-${i}`} w="150px">{label}</Table.ColumnHeader>
+        <Table.ColumnHeader key={`iteration-${i}`} w="150px">
+          {label}
+        </Table.ColumnHeader>
       );
     }
-    
+
     return (
       <Table.Row>
         {iterationHeaders}
@@ -87,14 +89,14 @@ export function TestCaseTable() {
     return (
       <Popover.Root size="xs">
         <Popover.Trigger asChild>
-          <Text 
-            fontSize="sm" 
-            overflow="hidden" 
-            textOverflow="ellipsis" 
+          <Text
+            fontSize="sm"
+            overflow="hidden"
+            textOverflow="ellipsis"
             whiteSpace="nowrap"
             lineClamp="2"
             cursor="pointer"
-            _hover={{ textDecoration: "underline" }}
+            _hover={{ textDecoration: 'underline' }}
           >
             {content}
           </Text>
@@ -105,7 +107,9 @@ export function TestCaseTable() {
               <Popover.Arrow />
               <Popover.Header>
                 <Flex alignItems="center">
-                  <Text fontSize="sm" fontWeight="medium">内容详情</Text>
+                  <Text fontSize="sm" fontWeight="medium">
+                    内容详情
+                  </Text>
                   <Spacer />
                   <Clipboard.Root value={content} ml={2}>
                     <Clipboard.Trigger asChild>
@@ -129,20 +133,16 @@ export function TestCaseTable() {
   // 渲染测试用例的迭代结果
   const renderIterationResults = (testCase: any) => {
     const cells = [];
-    
+
     // 遍历最大迭代次数，确保每行有相同数量的单元格
     for (let i = 0; i < maxIterationCount; i++) {
       const result = testCase.iterationResults.find((r: any) => r.iteration === i);
-      
+
       if (result) {
         cells.push(
           <Table.Cell key={`result-${i}`}>
             <Flex alignItems="center">
-              {result.score && (
-                <Box mr={2}>
-                  {renderScoreBadge(result.score)}
-                </Box>
-              )}
+              {result.score && <Box mr={2}>{renderScoreBadge(result.score)}</Box>}
               {renderPopoverText(result.output)}
             </Flex>
           </Table.Cell>
@@ -152,7 +152,7 @@ export function TestCaseTable() {
         cells.push(<Table.Cell key={`result-${i}`}></Table.Cell>);
       }
     }
-    
+
     return cells;
   };
 
@@ -167,19 +167,15 @@ export function TestCaseTable() {
             <Table.Row key={testCase.id}>
               {renderIterationResults(testCase)}
               <Table.Cell>
-                <Flex alignItems="center">
-                  {renderPopoverText(testCase.input)}
-                </Flex>
+                <Flex alignItems="center">{renderPopoverText(testCase.input)}</Flex>
               </Table.Cell>
               <Table.Cell>
-                <Flex alignItems="center">
-                  {renderPopoverText(testCase.expectedOutput)}
-                </Flex>
+                <Flex alignItems="center">{renderPopoverText(testCase.expectedOutput)}</Flex>
               </Table.Cell>
             </Table.Row>
           ))}
         </Table.Body>
       </Table.Root>
     </Box>
-  )
-} 
+  );
+}

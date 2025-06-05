@@ -1,32 +1,21 @@
-import {
-  Box,
-  Button,
-  Text,
-  Heading,
-  VStack,
-  Flex,
-  useBreakpointValue
-} from '@chakra-ui/react';
+import { Box, Button, Text, Heading, VStack, Flex, useBreakpointValue } from '@chakra-ui/react';
 import { useOptimizationStore } from '@/store/useOptimizationStore';
 import { useAppStore } from '@/store/useAppStore';
 import { FiPlus, FiSettings } from 'react-icons/fi';
 import { OptimizationTask } from '@/types/optimization';
 
 export function Sidebar() {
-  const { 
-    tasks, 
-    currentTaskId, 
-    selectTask
-  } = useOptimizationStore();
-  
+  const { tasks, currentTaskId, selectTask } = useOptimizationStore();
+
   const { setViewState } = useAppStore();
-  
+
   // 使用响应式宽度 - 在大屏幕上也使用固定宽度，保持侧边栏大小合适
-  const sidebarWidth = useBreakpointValue({ 
-    base: '280px', 
-    md: '280px',
-    xl: '300px'
-  }) || '280px';
+  const sidebarWidth =
+    useBreakpointValue({
+      base: '280px',
+      md: '280px',
+      xl: '300px',
+    }) || '280px';
 
   // 处理任务选择
   const handleTaskSelect = (taskId: string) => {
@@ -37,7 +26,7 @@ export function Sidebar() {
   const handleNewOptimization = () => {
     setViewState('upload');
   };
-  
+
   // 处理进入模型管理
   const handleModelManagement = () => {
     setViewState('model_management');
@@ -60,21 +49,23 @@ export function Sidebar() {
   };
 
   return (
-    <Box 
-      w={sidebarWidth} 
+    <Box
+      w={sidebarWidth}
       minWidth={sidebarWidth}
       maxWidth={sidebarWidth}
       flexShrink={0} // 防止flex布局下被压缩
       flexGrow={0} // 防止flex布局下被拉伸
-      bg="gray.900" 
-      color="white" 
-      p={4} 
-      display="flex" 
+      bg="gray.900"
+      color="white"
+      p={4}
+      display="flex"
       flexDirection="column"
       h="100vh"
     >
-      <Heading size="md" mb={4}>OKPrompt</Heading>
-      
+      <Heading size="md" mb={4}>
+        OKPrompt
+      </Heading>
+
       <Button
         bg="gray.700"
         borderRadius="lg"
@@ -88,7 +79,7 @@ export function Sidebar() {
           <Text>创建优化任务</Text>
         </Flex>
       </Button>
-      
+
       <Box flex="1" overflowY="auto">
         <VStack align="stretch" gap={3}>
           {tasks.map(task => (
@@ -103,14 +94,20 @@ export function Sidebar() {
               cursor="pointer"
               onClick={() => handleTaskSelect(task.id)}
             >
-              <Heading size="sm" fontWeight="semibold">{task.name}</Heading>
-              <Text fontSize="xs" color="gray.400" mt={1}>数据集: {task.datasetName}</Text>
-              <Text fontSize="xs" color="gray.400" mt={0.5}>状态: {getTaskStatusText(task)}</Text>
+              <Heading size="sm" fontWeight="semibold">
+                {task.name}
+              </Heading>
+              <Text fontSize="xs" color="gray.400" mt={1}>
+                数据集: {task.datasetName}
+              </Text>
+              <Text fontSize="xs" color="gray.400" mt={0.5}>
+                状态: {getTaskStatusText(task)}
+              </Text>
             </Box>
           ))}
         </VStack>
       </Box>
-      
+
       <Box mt="auto" pt={4} borderTop="1px solid" borderColor="gray.700">
         <Button
           width="100%"
@@ -128,4 +125,4 @@ export function Sidebar() {
       </Box>
     </Box>
   );
-} 
+}

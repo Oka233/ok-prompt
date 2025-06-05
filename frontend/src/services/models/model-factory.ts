@@ -4,7 +4,7 @@ import { GoogleAdapter } from './google-adapter';
 import { QwenAdapter } from './qwen-adapter';
 import { OpenRouterAdapter } from './openrouter-adapter';
 import { ModelConfig, ModelType } from '@/types/optimization';
-import { providers, ProviderType } from '@/services/models/providers'
+import { providers, ProviderType } from '@/services/models/providers';
 
 export class ModelFactory {
   static createModel(config: ModelConfig): ModelProvider {
@@ -30,7 +30,7 @@ export class ModelFactory {
           throw new Error(`不支持的模型类型: ${config.modelType}`);
       }
     }
-    
+
     return new adapter(
       config.apiKey,
       config.name,
@@ -39,4 +39,4 @@ export class ModelFactory {
       config.enableReasoning
     );
   }
-} 
+}

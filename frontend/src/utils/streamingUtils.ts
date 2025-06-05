@@ -26,12 +26,17 @@ export function filterContentByTag(
   //    我们寻找最后一个开标签，以及它之后最近的闭合标签，以处理嵌套或多个同名标签的情况。
   const lastOpenTagIndex = text.lastIndexOf(openTag);
   if (lastOpenTagIndex !== -1) {
-    const firstCloseTagIndexAfterLastOpen = text.indexOf(closeTag, lastOpenTagIndex + openTag.length);
+    const firstCloseTagIndexAfterLastOpen = text.indexOf(
+      closeTag,
+      lastOpenTagIndex + openTag.length
+    );
     if (firstCloseTagIndexAfterLastOpen !== -1) {
       // 找到了完整的标签对
       return {
         closed: true,
-        content: text.substring(lastOpenTagIndex + openTag.length, firstCloseTagIndexAfterLastOpen).trim(),
+        content: text
+          .substring(lastOpenTagIndex + openTag.length, firstCloseTagIndexAfterLastOpen)
+          .trim(),
         hasPartialOpenTag: true,
       };
     }
@@ -71,7 +76,9 @@ export function filterContentByTag(
         determinedHasPartialOpenTag = true;
         return {
           closed: false,
-          content: currentContent.substring(0, currentContent.length - partialOpenTag.length).trim(),
+          content: currentContent
+            .substring(0, currentContent.length - partialOpenTag.length)
+            .trim(),
           hasPartialOpenTag: determinedHasPartialOpenTag,
         };
       }
@@ -90,24 +97,26 @@ export function filterContentByTag(
 
 /**
  * 创建一个节流版本的 generateCompletionStream 函数
- * 
+ *
  * @param generateStreamFn 原始的流式生成函数
  * @param throttleInterval 节流间隔，单位为毫秒，默认为 200ms
  * @returns 返回一个节流后的函数，接口与原始函数相同
  */
-export function createThrottledStreamGenerator<T extends (messages: any[], callbacks: StreamCallbacks, options?: any) => Promise<any>>(
-  generateStreamFn: T,
-  throttleInterval: number = 100
-) {
-  return async function(messages: any[], callbacks: StreamCallbacks, options?: any): Promise<ReturnType<T>> {
+export function createThrottledStreamGenerator<
+  T extends (messages: any[], callbacks: StreamCallbacks, options?: any) => Promise<any>,
+>(generateStreamFn: T, throttleInterval: number = 100) {
+  return async function (
+    messages: any[],
+    callbacks: StreamCallbacks,
+    options?: any
+  ): Promise<ReturnType<T>> {
     // 创建节流版本的 onContent 回调
     let lastCallTime = 0;
 
     // 节流处理函数
     const throttledOnContent = (thought: string, answer: string) => {
-
       const now = Date.now();
-      
+
       // 如果距离上次调用时间不足，则延迟调用
       if (now - lastCallTime < throttleInterval) {
         return;
@@ -122,13 +131,15 @@ export function createThrottledStreamGenerator<T extends (messages: any[], callb
     const throttledCallbacks: StreamCallbacks = {
       ...callbacks,
       onContent: throttledOnContent,
-      onComplete: callbacks.onComplete ? (thought: string, answer: string) => {
-        // 最后一次 onContent 回调中包含最新的内容
-        callbacks.onContent(thought, answer);
+      onComplete: callbacks.onComplete
+        ? (thought: string, answer: string) => {
+            // 最后一次 onContent 回调中包含最新的内容
+            callbacks.onContent(thought, answer);
 
-        // 调用原始 onComplete 回调
-        callbacks.onComplete!(thought, answer);
-      } : undefined
+            // 调用原始 onComplete 回调
+            callbacks.onComplete!(thought, answer);
+          }
+        : undefined,
     };
 
     // 用修改后的回调调用原始函数

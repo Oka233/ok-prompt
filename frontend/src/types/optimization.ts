@@ -51,7 +51,8 @@ export interface TestCaseResult {
   index: number;
   input: string;
   expectedOutput: string;
-  iterationResults: { // 此测试用例在不同提示词迭代下的结果
+  iterationResults: {
+    // 此测试用例在不同提示词迭代下的结果
     iteration: number; // 指的是提示词的迭代轮次
     output: string;
     score: number | null; // 允许为null，表示等待评估

@@ -1,16 +1,8 @@
-import {
-  Button,
-  VStack,
-  Portal,
-  CloseButton,
-  Dialog,
-  Checkbox,
-  Field
-} from '@chakra-ui/react'
-import { FiSave, FiXCircle } from 'react-icons/fi'
-import { useState, useRef, useEffect } from 'react'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
-import { ModelSelect } from '@/components/ModelSelect'
+import { Button, VStack, Portal, CloseButton, Dialog, Checkbox, Field } from '@chakra-ui/react';
+import { FiSave, FiXCircle } from 'react-icons/fi';
+import { useState, useRef, useEffect } from 'react';
+import { useOptimizationStore } from '@/store/useOptimizationStore';
+import { ModelSelect } from '@/components/ModelSelect';
 
 interface ModelOption {
   label: string;
@@ -27,14 +19,20 @@ interface TaskSettingsDialogProps {
 export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDialogProps) {
   const { updateTaskModels, updateTaskFeedbackSetting } = useOptimizationStore();
   const tasks = useOptimizationStore(state => state.tasks);
-  
+
   // 获取当前任务
   const currentTask = tasks.find(t => t.id === taskId)!;
-  
-  const [selectedTargetModel, setSelectedTargetModel] = useState<string | undefined>(currentTask?.targetModelId);
-  const [selectedOptimizationModel, setSelectedOptimizationModel] = useState<string | undefined>(currentTask?.optimizationModelId);
-  const [requireUserFeedback, setRequireUserFeedback] = useState(currentTask?.requireUserFeedback || false);
-  
+
+  const [selectedTargetModel, setSelectedTargetModel] = useState<string | undefined>(
+    currentTask?.targetModelId
+  );
+  const [selectedOptimizationModel, setSelectedOptimizationModel] = useState<string | undefined>(
+    currentTask?.optimizationModelId
+  );
+  const [requireUserFeedback, setRequireUserFeedback] = useState(
+    currentTask?.requireUserFeedback || false
+  );
+
   const contentRef = useRef<HTMLDivElement>(null);
 
   // 初始化状态
@@ -49,10 +47,10 @@ export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDial
   const handleSaveSettings = async () => {
     // 更新模型设置
     await updateTaskModels(taskId, selectedTargetModel, selectedOptimizationModel);
-    
+
     // 更新用户反馈设置
     await updateTaskFeedbackSetting(taskId, requireUserFeedback);
-    
+
     onClose();
   };
 
@@ -74,11 +72,13 @@ export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDial
             <Dialog.Header>
               <Dialog.Title>设置</Dialog.Title>
             </Dialog.Header>
-            
+
             <Dialog.Body>
               <VStack gap={4} align="stretch">
                 <Field.Root>
-                  <Field.Label mb={1} fontSize="sm" fontWeight="medium">目标模型</Field.Label>
+                  <Field.Label mb={1} fontSize="sm" fontWeight="medium">
+                    目标模型
+                  </Field.Label>
                   <ModelSelect
                     value={selectedTargetModel}
                     onChange={setSelectedTargetModel}
@@ -86,9 +86,11 @@ export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDial
                     containerRef={contentRef}
                   />
                 </Field.Root>
-                
+
                 <Field.Root>
-                  <Field.Label mb={1} fontSize="sm" fontWeight="medium">优化模型</Field.Label>
+                  <Field.Label mb={1} fontSize="sm" fontWeight="medium">
+                    优化模型
+                  </Field.Label>
                   <ModelSelect
                     value={selectedOptimizationModel}
                     onChange={setSelectedOptimizationModel}
@@ -96,11 +98,11 @@ export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDial
                     containerRef={contentRef}
                   />
                 </Field.Root>
-                
+
                 <Field.Root>
                   <Checkbox.Root
                     checked={requireUserFeedback}
-                    onCheckedChange={(details) => {
+                    onCheckedChange={details => {
                       setRequireUserFeedback(!!details.checked);
                     }}
                   >
@@ -114,7 +116,7 @@ export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDial
                 </Field.Root>
               </VStack>
             </Dialog.Body>
-            
+
             <Dialog.Footer>
               <Dialog.ActionTrigger asChild>
                 <Button size="sm" variant="outline" onClick={handleCancelSettings}>
@@ -127,7 +129,7 @@ export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDial
                 保存
               </Button>
             </Dialog.Footer>
-            
+
             <Dialog.CloseTrigger asChild>
               <CloseButton size="sm" position="absolute" top={3} right={3} />
             </Dialog.CloseTrigger>
@@ -136,4 +138,4 @@ export function TaskSettingsDialog({ isOpen, onClose, taskId }: TaskSettingsDial
       </Portal>
     </Dialog.Root>
   );
-} 
+}

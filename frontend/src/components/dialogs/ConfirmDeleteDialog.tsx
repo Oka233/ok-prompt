@@ -1,11 +1,5 @@
-import {
-  Button,
-  Text,
-  Portal,
-  CloseButton,
-  Dialog
-} from '@chakra-ui/react'
-import { FiTrash2, FiXCircle } from 'react-icons/fi'
+import { Button, Text, Portal, CloseButton, Dialog } from '@chakra-ui/react';
+import { FiTrash2, FiXCircle } from 'react-icons/fi';
 
 interface ConfirmDeleteDialogProps {
   isOpen: boolean;
@@ -15,12 +9,12 @@ interface ConfirmDeleteDialogProps {
   itemName: string;
 }
 
-export function ConfirmDeleteDialog({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title, 
-  itemName 
+export function ConfirmDeleteDialog({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  itemName,
 }: ConfirmDeleteDialogProps) {
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
@@ -31,13 +25,11 @@ export function ConfirmDeleteDialog({
             <Dialog.Header>
               <Dialog.Title>{title}</Dialog.Title>
             </Dialog.Header>
-            
+
             <Dialog.Body>
-              <Text mb={2}>
-                确定要删除{itemName}吗？
-              </Text>
+              <Text mb={2}>确定要删除{itemName}吗？</Text>
             </Dialog.Body>
-            
+
             <Dialog.Footer>
               <Dialog.ActionTrigger asChild>
                 <Button size="sm" variant="outline" onClick={onClose}>
@@ -45,16 +37,12 @@ export function ConfirmDeleteDialog({
                   取消
                 </Button>
               </Dialog.ActionTrigger>
-              <Button 
-                size="sm" 
-                colorScheme="red" 
-                onClick={onConfirm}
-              >
+              <Button size="sm" colorScheme="red" onClick={onConfirm}>
                 <FiTrash2 />
                 删除
               </Button>
             </Dialog.Footer>
-            
+
             <Dialog.CloseTrigger asChild>
               <CloseButton size="sm" position="absolute" top={3} right={3} />
             </Dialog.CloseTrigger>
@@ -63,4 +51,4 @@ export function ConfirmDeleteDialog({
       </Portal>
     </Dialog.Root>
   );
-} 
+}

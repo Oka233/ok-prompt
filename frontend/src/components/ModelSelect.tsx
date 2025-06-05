@@ -17,12 +17,16 @@ export function ModelSelect({
   placeholder,
   size = 'sm',
   disabled = false,
-  containerRef
+  containerRef,
 }: ModelSelectProps) {
   const models = useModelStore(state => state.models);
-  const modelOptions = useMemo(() => createListCollection({
-    items: models.map(model => ({ label: model.displayName, value: model.id }))
-  }), [models]);
+  const modelOptions = useMemo(
+    () =>
+      createListCollection({
+        items: models.map(model => ({ label: model.displayName, value: model.id })),
+      }),
+    [models]
+  );
 
   return (
     <Select.Root
@@ -49,7 +53,7 @@ export function ModelSelect({
         <Select.Positioner>
           <Select.Content>
             {modelOptions.items.length > 0 ? (
-              modelOptions.items.map((model) => (
+              modelOptions.items.map(model => (
                 <Select.Item item={model} key={model.value}>
                   {model.label}
                   <Select.ItemIndicator />
@@ -65,4 +69,4 @@ export function ModelSelect({
       </Portal>
     </Select.Root>
   );
-} 
+}

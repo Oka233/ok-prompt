@@ -9,11 +9,11 @@ import {
   Slider,
   Field,
   Checkbox,
-  Input
-} from '@chakra-ui/react'
-import { FiSave, FiXCircle } from 'react-icons/fi'
-import { useState, useEffect } from 'react'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
+  Input,
+} from '@chakra-ui/react';
+import { FiSave, FiXCircle } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
+import { useOptimizationStore } from '@/store/useOptimizationStore';
 
 // 错误类型定义
 interface FormErrors {
@@ -30,20 +30,22 @@ interface ModelParamsDialogProps {
 export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialogProps) {
   const { updateTaskTestConfig } = useOptimizationStore();
   const tasks = useOptimizationStore(state => state.tasks);
-  
+
   // 获取当前任务
   const currentTask = tasks.find(t => t.id === taskId)!;
-  
+
   // 模型参数状态
   const [temperature, setTemperature] = useState(currentTask?.testConfig.temperature);
   const [topP, setTopP] = useState(currentTask?.testConfig.topP);
   const [maxTokens, setMaxTokens] = useState(String(currentTask?.testConfig.maxTokens));
-  
+
   // 将单一错误字符串改为错误对象
   const [errors, setErrors] = useState<FormErrors>({});
-  
+
   // 参数启用状态
-  const [enableTemperature, setEnableTemperature] = useState(currentTask?.testConfig.enableTemperature);
+  const [enableTemperature, setEnableTemperature] = useState(
+    currentTask?.testConfig.enableTemperature
+  );
   const [enableTopP, setEnableTopP] = useState(currentTask?.testConfig.enableTopP);
   const [enableMaxTokens, setEnableMaxTokens] = useState(currentTask?.testConfig.enableMaxTokens);
 
@@ -64,12 +66,12 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
     // 使用正则表达式验证输入是否为非负整数
     const regex = /^\d+$/;
     if (!regex.test(value)) {
-      setErrors(prev => ({...prev, maxTokens: "请输入有效的数字"}));
+      setErrors(prev => ({ ...prev, maxTokens: '请输入有效的数字' }));
       return false;
     }
     // 清除错误
     setErrors(prev => {
-      const newErrors = {...prev};
+      const newErrors = { ...prev };
       delete newErrors.maxTokens;
       return newErrors;
     });
@@ -87,7 +89,7 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
     if (enableMaxTokens && !validateMaxTokens(maxTokens)) {
       return;
     }
-    
+
     try {
       // 更新测试配置
       await updateTaskTestConfig(taskId, {
@@ -96,14 +98,14 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
         maxTokens: Number(maxTokens),
         enableTemperature,
         enableTopP,
-        enableMaxTokens
+        enableMaxTokens,
       });
-      
+
       // 关闭对话框
       onClose();
     } catch (err) {
       setErrors({
-        general: err instanceof Error ? err.message : '更新失败'
+        general: err instanceof Error ? err.message : '更新失败',
       });
     }
   };
@@ -132,7 +134,7 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
             <Dialog.Header>
               <Dialog.Title>模型参数设置</Dialog.Title>
             </Dialog.Header>
-            
+
             <Dialog.Body>
               <VStack gap={6} align="stretch">
                 <Field.Root>
@@ -140,12 +142,14 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
                     <Field.Label fontSize="sm" fontWeight="medium">
                       <Checkbox.Root
                         checked={enableTemperature}
-                        onCheckedChange={(details) => setEnableTemperature(!!details.checked)}
+                        onCheckedChange={details => setEnableTemperature(!!details.checked)}
                         mr={1}
                       >
                         <Checkbox.HiddenInput />
                         <Checkbox.Control />
-                    </Checkbox.Root>温度 (Temperature)</Field.Label>
+                      </Checkbox.Root>
+                      温度 (Temperature)
+                    </Field.Label>
                     <Text fontSize="sm">{temperature}</Text>
                   </HStack>
                   <Slider.Root
@@ -155,7 +159,7 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
                     min={0}
                     max={2}
                     step={0.01}
-                    onValueChange={(details) => setTemperature(details.value[0])}
+                    onValueChange={details => setTemperature(details.value[0])}
                     disabled={!enableTemperature}
                   >
                     <Slider.Control>
@@ -169,13 +173,13 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
                     较低的值使输出更确定性，较高的值使输出更多样化和创造性
                   </Field.HelperText>
                 </Field.Root>
-                
+
                 <Field.Root>
                   <HStack w="100%" mb={1} justifyContent="space-between">
                     <Field.Label fontSize="sm" fontWeight="medium">
                       <Checkbox.Root
                         checked={enableTopP}
-                        onCheckedChange={(details) => setEnableTopP(!!details.checked)}
+                        onCheckedChange={details => setEnableTopP(!!details.checked)}
                         mr={1}
                       >
                         <Checkbox.HiddenInput />
@@ -192,7 +196,7 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
                     min={0}
                     max={1}
                     step={0.01}
-                    onValueChange={(details) => setTopP(details.value[0])}
+                    onValueChange={details => setTopP(details.value[0])}
                     disabled={!enableTopP}
                   >
                     <Slider.Control>
@@ -206,12 +210,12 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
                     控制生成文本的概率范围，较低的值限制在最可能的选项
                   </Field.HelperText>
                 </Field.Root>
-                
+
                 <Field.Root invalid={!!errors.maxTokens}>
                   <Field.Label fontSize="sm" fontWeight="medium">
                     <Checkbox.Root
                       checked={enableMaxTokens}
-                      onCheckedChange={(details) => setEnableMaxTokens(!!details.checked)}
+                      onCheckedChange={details => setEnableMaxTokens(!!details.checked)}
                       mr={1}
                     >
                       <Checkbox.HiddenInput />
@@ -235,7 +239,7 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
                     </Field.HelperText>
                   )}
                 </Field.Root>
-                
+
                 {/* 通用错误显示 */}
                 {errors.general && (
                   <Field.Root invalid>
@@ -244,7 +248,7 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
                 )}
               </VStack>
             </Dialog.Body>
-            
+
             <Dialog.Footer>
               <Dialog.ActionTrigger asChild>
                 <Button size="sm" variant="outline" onClick={handleCancelParams}>
@@ -257,7 +261,7 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
                 保存
               </Button>
             </Dialog.Footer>
-            
+
             <Dialog.CloseTrigger asChild>
               <CloseButton size="sm" position="absolute" top={3} right={3} />
             </Dialog.CloseTrigger>
@@ -266,4 +270,4 @@ export function ModelParamsDialog({ isOpen, onClose, taskId }: ModelParamsDialog
       </Portal>
     </Dialog.Root>
   );
-} 
+}

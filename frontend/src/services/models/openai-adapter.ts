@@ -1,7 +1,12 @@
-import { ModelProvider, ModelResponse, ModelMessage, ModelOptions, StreamCallbacks } from '@/types/model';
+import {
+  ModelProvider,
+  ModelResponse,
+  ModelMessage,
+  ModelOptions,
+  StreamCallbacks,
+} from '@/types/model';
 import { ModelReasoningType } from '@/types/optimization';
 import OpenAI from 'openai';
-
 
 export class OpenAIAdapter implements ModelProvider {
   private client: OpenAI;
@@ -33,46 +38,49 @@ export class OpenAIAdapter implements ModelProvider {
    */
   protected adaptOptions(options?: ModelOptions): ModelOptions {
     if (!options) return {};
-    
+
     const adaptedOptions = { ...options };
-    
+
     // 将topP转换为top_p
     if (options.topP !== undefined) {
       adaptedOptions.top_p = options.topP;
       delete adaptedOptions.topP;
     }
-    
+
     // 将maxTokens转换为max_tokens
     if (options.maxTokens !== undefined) {
       adaptedOptions.max_tokens = options.maxTokens;
       delete adaptedOptions.maxTokens;
     }
-    
+
     return adaptedOptions;
   }
 
   /**
    * 非流式生成完成
    */
-  async generateCompletion(messages: ModelMessage[], options?: ModelOptions): Promise<ModelResponse> {
+  async generateCompletion(
+    messages: ModelMessage[],
+    options?: ModelOptions
+  ): Promise<ModelResponse> {
     try {
       // 适配参数格式
       const adaptedOptions = this.adaptOptions(options);
-      
+
       const response = await this.client.chat.completions.create({
         model: this.modelName,
         messages: messages as any,
-        ...adaptedOptions
+        ...adaptedOptions,
       });
-      
+
       // 提取使用的token信息
       const promptTokens = response.usage?.prompt_tokens || 0;
       const completionTokens = response.usage?.completion_tokens || 0;
       const totalTokens = response.usage?.total_tokens || 0;
-      
+
       // 尝试提取reasoning_content
       const thought = (response.choices[0] as any).reasoning_content || '';
-      
+
       return {
         thought: thought,
         answer: response.choices[0].message.content || '',
@@ -80,7 +88,7 @@ export class OpenAIAdapter implements ModelProvider {
           promptTokens,
           completionTokens,
           totalTokens,
-        }
+        },
       };
     } catch (error) {
       console.error('OpenAI API调用失败:', error);
@@ -92,32 +100,32 @@ export class OpenAIAdapter implements ModelProvider {
    * 流式生成完成
    */
   async generateCompletionStream(
-    messages: ModelMessage[], 
+    messages: ModelMessage[],
     callbacks: StreamCallbacks,
     options?: ModelOptions
   ): Promise<void> {
     try {
       // 适配参数格式
       const adaptedOptions = this.adaptOptions(options);
-      
+
       const stream = await this.client.chat.completions.create({
         model: this.modelName,
         messages: messages as any,
         stream: true,
         stream_options: { include_usage: true },
-        ...adaptedOptions
+        ...adaptedOptions,
       });
-      
+
       let fullContent = '';
       let thought = ''; // 用于累积推理内容
-      
+
       for await (const chunk of stream) {
         // 处理token用量信息（通常在最后一个chunk中）
         if (chunk.usage) {
           const usage = {
             promptTokens: chunk.usage.prompt_tokens || 0,
             completionTokens: chunk.usage.completion_tokens || 0,
-            totalTokens: chunk.usage.total_tokens || 0
+            totalTokens: chunk.usage.total_tokens || 0,
           };
           if (callbacks.onUsage) {
             callbacks.onUsage(usage);
@@ -127,23 +135,23 @@ export class OpenAIAdapter implements ModelProvider {
         if (!chunk.choices || chunk.choices.length === 0 || !chunk.choices[0].delta) {
           continue;
         }
-        
+
         const chunkDelta = chunk.choices[0].delta as any;
-        
+
         // 推理
         const reasoningContent = chunkDelta.reasoning_content || chunkDelta.reasoning;
         if (reasoningContent) {
           thought += reasoningContent;
           callbacks.onContent(thought, fullContent);
         }
-        
+
         // 回答
         if (chunk.choices[0].delta.content) {
           fullContent += chunk.choices[0].delta.content;
           callbacks.onContent(thought, fullContent);
         }
       }
-      
+
       // 调用完成回调
       if (callbacks.onComplete) {
         callbacks.onComplete(thought, fullContent);
@@ -157,4 +165,4 @@ export class OpenAIAdapter implements ModelProvider {
       throw err;
     }
   }
-} 
+}
