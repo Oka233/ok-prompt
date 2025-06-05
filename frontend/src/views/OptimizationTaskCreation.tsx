@@ -15,8 +15,9 @@ import {
   Field
 } from '@chakra-ui/react'
 import { FiUploadCloud, FiPlus, FiTrash2, FiLayers } from 'react-icons/fi'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useOptimizationStore } from '@/store/useOptimizationStore.ts'
+import { useModelStore } from '@/store/useModelStore'
 import { ModelSelect } from '@/components/ModelSelect'
 
 interface NoDatasetViewProps {
@@ -58,7 +59,8 @@ export function OptimizationTaskCreation({ onUpload }: NoDatasetViewProps) {
   // 将单一错误字符串改为错误对象
   const [errors, setErrors] = useState<FormErrors>({});
   
-  const { createTask, models } = useOptimizationStore();
+  const { createTask } = useOptimizationStore();
+  const { models } = useModelStore();
   const [targetModelId, setTargetModelId] = useState<string | undefined>(undefined);
   const [optimizationModelId, setOptimizationModelId] = useState<string | undefined>(undefined);
   const [requireUserFeedback, setRequireUserFeedback] = useState(false);

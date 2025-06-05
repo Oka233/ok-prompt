@@ -8,6 +8,7 @@ import {
   useBreakpointValue
 } from '@chakra-ui/react';
 import { useOptimizationStore } from '@/store/useOptimizationStore';
+import { useAppStore } from '@/store/useAppStore';
 import { FiPlus, FiSettings } from 'react-icons/fi';
 import { OptimizationTask } from '@/types/optimization';
 
@@ -15,9 +16,10 @@ export function Sidebar() {
   const { 
     tasks, 
     currentTaskId, 
-    selectTask, 
-    setViewState 
+    selectTask
   } = useOptimizationStore();
+  
+  const { setViewState } = useAppStore();
   
   // 使用响应式宽度 - 在大屏幕上也使用固定宽度，保持侧边栏大小合适
   const sidebarWidth = useBreakpointValue({ 

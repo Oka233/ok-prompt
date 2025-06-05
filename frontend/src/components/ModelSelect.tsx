@@ -1,5 +1,5 @@
 import { Select, createListCollection, Portal } from '@chakra-ui/react';
-import { useOptimizationStore } from '@/store/useOptimizationStore';
+import { useModelStore } from '@/store/useModelStore';
 import { useMemo } from 'react';
 
 interface ModelSelectProps {
@@ -19,7 +19,7 @@ export function ModelSelect({
   disabled = false,
   containerRef
 }: ModelSelectProps) {
-  const models = useOptimizationStore(state => state.models);
+  const models = useModelStore(state => state.models);
   const modelOptions = useMemo(() => createListCollection({
     items: models.map(model => ({ label: model.displayName, value: model.id }))
   }), [models]);

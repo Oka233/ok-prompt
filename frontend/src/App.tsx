@@ -3,10 +3,12 @@ import { Sidebar } from '@/components/Sidebar'
 import { MainContent } from './components/MainContent'
 import { useEffect } from 'react'
 import { useOptimizationStore } from './store/useOptimizationStore'
+import { useAppStore } from './store/useAppStore'
 import { Toaster } from "@/components/ui/toaster"
 
 function App() {
-  const { tasks, currentTaskId, setViewState, selectTask } = useOptimizationStore()
+  const { tasks, currentTaskId, selectTask } = useOptimizationStore()
+  const { setViewState } = useAppStore()
 
   // 页面加载时检查任务并设置默认视图
   useEffect(() => {

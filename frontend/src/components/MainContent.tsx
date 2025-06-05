@@ -2,10 +2,10 @@ import { Box } from '@chakra-ui/react'
 import { OptimizationTaskCreation } from '@/views/OptimizationTaskCreation.tsx'
 import { OptimizationTask } from '@/views/OptimizationTask'
 import { ModelManagement } from '@/views/ModelManagement.tsx'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
+import { useAppStore } from '@/store/useAppStore'
 
 export function MainContent() {
-  const { viewState, setViewState } = useOptimizationStore()
+  const { viewState, setViewState } = useAppStore()
   
   return (
     <Box 

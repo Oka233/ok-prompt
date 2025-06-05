@@ -19,7 +19,7 @@ import {
 } from '@chakra-ui/react'
 import { FiSave, FiXCircle } from 'react-icons/fi'
 import { useState, useRef, useEffect } from 'react'
-import { useOptimizationStore } from '@/store/useOptimizationStore'
+import { useModelStore } from '@/store/useModelStore'
 import { ModelConfig, ModelType, ModelReasoningType } from '@/types/optimization'
 import { toaster } from "@/components/ui/toaster"
 import { providers, ProviderType } from '@/services/models/providers'
@@ -96,6 +96,21 @@ const modelTypeOptions = [
   },
 ]
 
+const modelReasoningOptions = [
+  {
+    label: '非推理模型',
+    value: ModelReasoningType.NON_REASONING
+  },
+  {
+    label: '推理模型',
+    value: ModelReasoningType.REASONING
+  },
+  {
+    label: '混合模型',
+    value: ModelReasoningType.MIXED
+  }
+]
+
 // 错误类型定义
 interface FormErrors {
   modelName?: string;
@@ -113,7 +128,7 @@ interface ModelFormDialogProps {
 }
 
 export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: ModelFormDialogProps) {
-  const { addModel, updateModel } = useOptimizationStore();
+  const { addModel, updateModel } = useModelStore();
   
   const [modelName, setModelName] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -245,9 +260,6 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
     if (!displayName.trim()) {
       newErrors.displayName = '请输入展示名称';
       isValid = false;
-    } else {
-      // 检查展示名称是否重复 - 需要在组件外部进行验证
-      // 这部分逻辑需要在提交时通过上层组件处理
     }
     
     // 验证API密钥
@@ -368,21 +380,6 @@ export function ModelFormDialog({ isOpen, onClose, currentModel, isEditing }: Mo
       value: provider.value 
     }))
   });
-
-  const modelReasoningOptions = [
-    {
-      label: '非推理模型',
-      value: ModelReasoningType.NON_REASONING
-    },
-    {
-      label: '推理模型',
-      value: ModelReasoningType.REASONING
-    },
-    {
-      label: '混合模型',
-      value: ModelReasoningType.MIXED
-    }
-  ]
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>

@@ -12,7 +12,7 @@ import { Table } from '@chakra-ui/react'
 import { toaster } from "@/components/ui/toaster.tsx"
 import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi'
 import { useState } from 'react'
-import { useOptimizationStore } from '@/store/useOptimizationStore.ts'
+import { useModelStore } from '@/store/useModelStore'
 import { ModelConfig, ModelType } from '@/types/optimization.ts'
 import { ModelFormDialog } from '../components/dialogs/ModelFormDialog.tsx'
 import { ConfirmDeleteDialog } from '../components/dialogs/ConfirmDeleteDialog.tsx'
@@ -58,7 +58,7 @@ const modelTypeOptions = [
 ]
 
 export function ModelManagement() {
-  const { models, deleteModel } = useOptimizationStore()
+  const { models, deleteModel } = useModelStore()
   const { open: isModelFormOpen, onOpen: onModelFormOpen, onClose: onModelFormClose } = useDisclosure()
   const { open: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
   const [isEditing, setIsEditing] = useState(false)

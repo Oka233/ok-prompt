@@ -14,7 +14,6 @@ export class QwenAdapter extends OpenAIAdapter {
     }
 
     getReasoningParameter(enableReasoning: boolean): object {
-        console.log(this.modelReasoningType)
         if ([ModelReasoningType.NON_REASONING, ModelReasoningType.REASONING].includes(this.modelReasoningType)) {
             return {};
         }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { OptimizationTask, TestSet, ModelConfig, TestCaseResult, PromptIteration, ModelType, ModelReasoningType } from '@/types/optimization';
+import { OptimizationTask, TestSet, TestCaseResult, PromptIteration } from '@/types/optimization';
 import {
   executeTests,
   evaluateResults,
@@ -13,6 +13,8 @@ import {
 import { toaster } from "@/components/ui/toaster";
 import { ModelFactory } from '@/services/models/model-factory';
 import { OperationCancelledError } from '@/errors/OperationCancelledError';
+import { useAppStore } from './useAppStore';
+import { useModelStore } from './useModelStore';
 
 // 根据任务ID更新任务
 const updateTask = (state: OptimizationState, taskId: string, updater: (task: OptimizationTask) => Partial<OptimizationTask>) => {
@@ -47,9 +49,6 @@ const isTaskPaused = (state: OptimizationState, taskId: string): boolean => {
   return !task || task.status === 'paused';
 };
 
-// 添加视图状态类型
-export type ViewState = 'upload' | 'task_view' | 'model_management';
-
 // 添加任务详细数据类型
 export interface TaskDetailData {
   taskId: string;
@@ -61,13 +60,6 @@ interface OptimizationState {
   // 基本状态
   tasks: OptimizationTask[];
   currentTaskId: string | null;
-  error: string | null;
-  
-  // 视图状态
-  viewState: ViewState;
-  
-  // 模型管理
-  models: ModelConfig[];
   
   // 任务管理
   createTask: (name: string, testSet: TestSet, initialPrompt: string, maxIterations?: number, tokenBudget?: number, targetModelId?: string, optimizationModelId?: string, requireUserFeedback?: boolean, concurrentCalls?: number) => Promise<void>;
@@ -79,21 +71,9 @@ interface OptimizationState {
   updateTaskConcurrentCalls: (taskId: string, concurrentCalls: number) => Promise<void>;
   updateTaskTestConfig: (taskId: string, testConfig: { temperature: number; topP: number; maxTokens: number; enableTemperature: boolean; enableTopP: boolean; enableMaxTokens: boolean }) => Promise<void>;
   
-  // 视图控制
-  setViewState: (state: ViewState) => void;
-  
   // 优化操作
   startOptimization: (taskId: string) => Promise<void>;
   stopOptimization: (taskId: string) => Promise<void>;
-
-  // 模型管理
-  addModel: (name: string, displayName: string, apiKey: string, baseUrl: string, modelType: ModelType, modelReasoningType: ModelReasoningType, enableReasoning?: boolean) => Promise<void>;
-  updateModel: (id: string, data: Partial<ModelConfig>) => Promise<void>;
-  deleteModel: (id: string) => Promise<void>;
-
-  // 高级操作 (占位)
-  exportTask: (taskId: string) => Promise<string>;
-  importTask: (taskData: string) => Promise<void>;
 
   submitUserFeedback: (taskId: string, iterationId: string, feedback: string) => Promise<void>;
   closeSummary: (taskId: string, iterationId: string) => void;
@@ -106,93 +86,77 @@ export const useOptimizationStore = create<OptimizationState>()(
     (set, get) => ({
       tasks: [],
       currentTaskId: null,
-      error: null,
-      viewState: 'upload',
-      models: [],
-      
-      // 视图控制
-      setViewState: (state) => {
-        set({ viewState: state });
-      },
       
       // 任务管理
       createTask: async (name, testSet, initialPrompt, maxIterations = 20, tokenBudget, targetModelId, optimizationModelId, requireUserFeedback = false, concurrentCalls = 3) => {
-        set({ error: null });
-        try {
-          const initialTestCases: TestCaseResult[] = testSet.data.map((tc, index) => ({
-            id: crypto.randomUUID(),
-            index: index + 1,
-            input: tc.input,
-            expectedOutput: tc.output,
-            iterationResults: [] 
-          }));
+        const initialTestCases: TestCaseResult[] = testSet.data.map((tc, index) => ({
+          id: crypto.randomUUID(),
+          index: index + 1,
+          input: tc.input,
+          expectedOutput: tc.output,
+          iterationResults: [] 
+        }));
 
-          const initialPromptIteration: PromptIteration = {
-            id: crypto.randomUUID(),
-            iteration: 0,
-            prompt: initialPrompt,
-            avgScore: null,
-            reportSummary: '尚未生成',
-            waitingForFeedback: requireUserFeedback,
-            stage: 'generated'
-          };
+        const initialPromptIteration: PromptIteration = {
+          id: crypto.randomUUID(),
+          iteration: 0,
+          prompt: initialPrompt,
+          avgScore: null,
+          reportSummary: '尚未生成',
+          waitingForFeedback: requireUserFeedback,
+          stage: 'generated'
+        };
 
-          const newTask: OptimizationTask = {
-            id: crypto.randomUUID(),
-            name,
-            datasetName: '手动创建',
-            testSet,
-            maxIterations,
-            status: 'not_started' as const,
-            tokenBudget,
-            targetModelTokenUsage: {
-              promptTokens: 0,
-              completionTokens: 0,
-              totalTokens: 0
-            },
-            optimizationModelTokenUsage: {
-              promptTokens: 0,
-              completionTokens: 0,
-              totalTokens: 0
-            },
-            targetModelId,
-            optimizationModelId,
-            requireUserFeedback,
-            concurrentCalls,
-            testCases: initialTestCases,
-            promptIterations: [initialPromptIteration],
-            testConfig: {
-              temperature: 0.7,
-              topP: 1.0,
-              maxTokens: 2048,
-              enableTemperature: false,
-              enableTopP: false,
-              enableMaxTokens: false
-            }
-          };
-          
-          set(state => ({ 
-            tasks: [newTask, ...state.tasks],
-            currentTaskId: newTask.id,
-            viewState: 'task_view',
-          }));          
-        } catch (error) {
-          set({ error: (error as Error).message });
-        }
+        const newTask: OptimizationTask = {
+          id: crypto.randomUUID(),
+          name,
+          datasetName: '手动创建',
+          testSet,
+          maxIterations,
+          status: 'not_started' as const,
+          tokenBudget,
+          targetModelTokenUsage: {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0
+          },
+          optimizationModelTokenUsage: {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0
+          },
+          targetModelId,
+          optimizationModelId,
+          requireUserFeedback,
+          concurrentCalls,
+          testCases: initialTestCases,
+          promptIterations: [initialPromptIteration],
+          testConfig: {
+            temperature: 0.7,
+            topP: 1.0,
+            maxTokens: 2048,
+            enableTemperature: false,
+            enableTopP: false,
+            enableMaxTokens: false
+          }
+        };
+        
+        set(state => ({ 
+          tasks: [newTask, ...state.tasks],
+          currentTaskId: newTask.id,
+        }));
+        
+        // 使用AppStore更新视图状态
+        useAppStore.getState().setViewState('task_view');
       },
       
       loadTasks: async () => {
-        set({ error: null });
-        try {
-          const tasks = get().tasks;
-          if (tasks.length > 0 && !get().currentTaskId) {
-            const firstTask = tasks[0];
-            set({
-              currentTaskId: firstTask.id,
-            });
-          }
-        } catch (error) {
-          set({ error: (error as Error).message });
+        const tasks = get().tasks;
+        if (tasks.length > 0 && !get().currentTaskId) {
+          const firstTask = tasks[0];
+          set({
+            currentTaskId: firstTask.id,
+          });
         }
       },
       
@@ -200,8 +164,10 @@ export const useOptimizationStore = create<OptimizationState>()(
         const task = get().tasks.find(t => t.id === taskId);
         set({ 
           currentTaskId: task ? taskId : null,
-          viewState: task ? 'task_view' : 'upload'
         });
+        
+        // 使用AppStore更新视图状态
+        useAppStore.getState().setViewState(task ? 'task_view' : 'upload');
         
         if (!task) {
           console.warn(`选择任务失败: 未找到ID为 ${taskId} 的任务`);
@@ -209,26 +175,27 @@ export const useOptimizationStore = create<OptimizationState>()(
       },
       
       deleteTask: async (taskId) => {
-        set({ error: null });
-        try {
-          set(state => {
-            const newTasks = state.tasks.filter(task => task.id !== taskId);
-            const isCurrentDeleted = state.currentTaskId === taskId;
-            
-            return {
-              tasks: newTasks,
-              currentTaskId: isCurrentDeleted ? (newTasks.length > 0 ? newTasks[0].id : null) : state.currentTaskId,
-              viewState: isCurrentDeleted ? (newTasks.length > 0 ? 'task_view' : 'upload') : state.viewState
-            };
-          });
-        } catch (error) {
-          set({ error: (error as Error).message });
+        set(state => {
+          const newTasks = state.tasks.filter(task => task.id !== taskId);
+          const isCurrentDeleted = state.currentTaskId === taskId;
+          
+          return {
+            tasks: newTasks,
+            currentTaskId: isCurrentDeleted ? (newTasks.length > 0 ? newTasks[0].id : null) : state.currentTaskId,
+          };
+        });
+        
+        // 如果删除当前任务，更新视图状态
+        const updatedState = get();
+        if (updatedState.currentTaskId) {
+          useAppStore.getState().setViewState('task_view');
+        } else {
+          useAppStore.getState().setViewState('upload');
         }
       },
       
       // 优化操作
       startOptimization: async (taskId) => {
-        set({ error: null });
         let toasterId : string | undefined = undefined;
         try {
           // 获取任务信息
@@ -237,12 +204,13 @@ export const useOptimizationStore = create<OptimizationState>()(
             throw new Error(`未找到ID为 ${taskId} 的任务`);
           }
           
-          // 获取模型信息
+          // 从ModelStore获取模型信息
+          const modelStore = useModelStore.getState();
           const targetModel = task.targetModelId 
-            ? get().models.find(m => m.id === task.targetModelId)
+            ? modelStore.models.find(m => m.id === task.targetModelId)
             : null;
           const optimizationModel = task.optimizationModelId 
-            ? get().models.find(m => m.id === task.optimizationModelId)
+            ? modelStore.models.find(m => m.id === task.optimizationModelId)
             : null;
           
           if (!targetModel || !optimizationModel) {
@@ -728,7 +696,6 @@ export const useOptimizationStore = create<OptimizationState>()(
               
               console.error('优化迭代执行失败:', error);
               set(state => ({
-                error: (error as Error).message,
                 ...updateTask(state, taskId, () => ({ status: 'paused' as const }))
               }));
               
@@ -769,84 +736,14 @@ export const useOptimizationStore = create<OptimizationState>()(
       },
       
       stopOptimization: async (taskId) => {
-        set({ error: null });
-        try {
-          set(state => updateTask(state, taskId, () => ({ status: 'paused' as const })));
-          
-          // 当用户点击停止时，提示用户
-          toaster.create({
-            title: "停止优化",
-            description: "当前已发送的请求返回后，任务将停止",
-            type: "default",
-          });
-        } catch (error) {
-          set({ error: (error as Error).message });
-        }
-      },
-      
-      // 高级操作
-      exportTask: async (taskId) => {
-        const task = get().tasks.find(t => t.id === taskId);
-        if (!task) throw new Error('Task not found for export');
-        return JSON.stringify(task); // task 结构已包含 details
-      },
-      
-      importTask: async (taskData) => {
-        try {
-          const task = JSON.parse(taskData) as OptimizationTask;
-          // TODO: 可以进行更详细的验证确保 task 结构符合 OptimizationTask
-          set(state => ({ tasks: [...state.tasks, task] }));
-        } catch (error) {
-          console.error('导入任务失败:', error);
-          set({ error: '导入任务失败: 文件格式或内容无效' });
-        }
-      },
-      
-      // 模型管理
-      addModel: async (name, displayName, apiKey, baseUrl, modelType, modelReasoningType, enableReasoning = false) => {
-        set({ error: null });
-        try {
-          const newModel: ModelConfig = {
-            id: crypto.randomUUID(),
-            name,
-            displayName,
-            apiKey,
-            baseUrl,
-            modelType,
-            modelReasoningType,
-            enableReasoning,
-          };
-          set(state => ({ 
-            models: [...state.models, newModel],
-          })); 
-        } catch (error) {
-          set({ error: (error as Error).message });
-        }
-      },
-      updateModel: async (id, data) => {
-        set({ error: null });
-        try {
-          set(state => ({
-            models: state.models.map(model => 
-              model.id === id 
-                ? { ...model, ...data }
-                : model
-            ),
-          }));
-        } catch (error) {
-          set({ error: (error as Error).message });
-        }
-      },
-      deleteModel: async (id) => {
-        set({ error: null });
-        try {
-          set(state => ({
-            models: state.models.filter(model => model.id !== id),
-          }));
-        } catch (error) {
-          set({ error: (error as Error).message });
-          throw error; // 重新抛出错误，让UI层可以捕获
-        }
+        set(state => updateTask(state, taskId, () => ({ status: 'paused' as const })));
+        
+        // 当用户点击停止时，提示用户
+        toaster.create({
+          title: "停止优化",
+          description: "当前已发送的请求返回后，任务将停止",
+          type: "default",
+        });
       },
       
       // 任务模型关联
@@ -895,17 +792,11 @@ export const useOptimizationStore = create<OptimizationState>()(
       },
 
       submitUserFeedback: async (taskId: string, iterationId: string, feedback: string) => {
-        set({ error: null });
-        try {
-          set(state => updateIteration(state, taskId, iterationId, () => ({
-            userFeedback: feedback,
-            waitingForFeedback: false
-          })));
-          get().startOptimization(taskId);
-        } catch (error) {
-          set({ error: (error as Error).message });
-          throw error;
-        }
+        set(state => updateIteration(state, taskId, iterationId, () => ({
+          userFeedback: feedback,
+          waitingForFeedback: false
+        })));
+        get().startOptimization(taskId);
       },
       
       closeSummary: (taskId, iterationId) => {
@@ -932,7 +823,6 @@ export const useOptimizationStore = create<OptimizationState>()(
       // 只持久化部分状态
       partialize: (state) => ({
         tasks: state.tasks,
-        models: state.models,
       }),
     }
   )
