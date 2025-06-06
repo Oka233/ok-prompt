@@ -183,7 +183,8 @@ export async function evaluateResults({
       prompt,
       { input: result.input, output: result.expectedOutput },
       result.actualOutput,
-      testMode
+      testMode,
+      model.enableReasoning
     );
 
     const response = await model.generateCompletion(messages);
@@ -282,9 +283,10 @@ export async function summarizeEvaluation({
       input: res.input,
       expectedOutput: res.expectedOutput,
       actualOutput: res.actualOutput,
-      score: res.score || 0, // 处理null值
-      reasoning: res.comment || '', // 处理null值
-    }))
+      score: res.score as number,
+      comment: res.comment as string,
+    })),
+    model.enableReasoning
   );
 
   let fullContent = '';
@@ -382,7 +384,6 @@ export async function optimizePrompt({
   }
 
   // 构建优化提示词
-  const useReasoning = model.enableReasoning;
   const messages = generateOptimizationPrompt(
     currentPrompt,
     evaluationSummary,
@@ -391,7 +392,7 @@ export async function optimizePrompt({
     historicalIterations,
     currentResults,
     currentAvgScore,
-    useReasoning
+    model.enableReasoning
   );
 
   let fullContent = '';
