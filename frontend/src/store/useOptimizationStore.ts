@@ -69,6 +69,7 @@ interface OptimizationState {
   // 任务管理
   createTask: (
     name: string,
+    datasetName: string,
     testSet: TestSet,
     initialPrompt: string,
     maxIterations?: number,
@@ -119,6 +120,7 @@ export const useOptimizationStore = create<OptimizationState>()(
       // 任务管理
       createTask: async (
         name,
+        datasetName,
         testSet,
         initialPrompt,
         maxIterations = 20,
@@ -149,7 +151,7 @@ export const useOptimizationStore = create<OptimizationState>()(
         const newTask: OptimizationTask = {
           id: crypto.randomUUID(),
           name,
-          datasetName: '手动创建',
+          datasetName,
           testSet,
           maxIterations,
           status: 'not_started' as const,

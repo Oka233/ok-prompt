@@ -55,6 +55,7 @@ export function OptimizationTaskCreation({ onUpload }: NoDatasetViewProps) {
   const [testMode, setTestMode] = useState('strict');
   const [testCases, setTestCases] = useState<TestCase[]>([{ input: '', expectedOutput: '' }]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [datasetName, setDatasetName] = useState('手动创建');
 
   // 将单一错误字符串改为错误对象
   const [errors, setErrors] = useState<FormErrors>({});
@@ -114,6 +115,7 @@ export function OptimizationTaskCreation({ onUpload }: NoDatasetViewProps) {
 
       await createTask(
         taskName,
+        datasetName,
         {
           mode: testMode as 'strict' | 'descriptive',
           data: validTestCases.map(tc => ({
@@ -184,6 +186,7 @@ export function OptimizationTaskCreation({ onUpload }: NoDatasetViewProps) {
         });
 
         setTestCases(newTestCases);
+        setDatasetName(file.name);
         if (e.target) {
           e.target.value = '';
         }
