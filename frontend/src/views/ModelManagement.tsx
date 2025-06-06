@@ -16,46 +16,7 @@ import { useModelStore } from '@/store/useModelStore';
 import { ModelConfig, ModelType } from '@/types/optimization.ts';
 import { ModelFormDialog } from '../components/dialogs/ModelFormDialog.tsx';
 import { ConfirmDeleteDialog } from '../components/dialogs/ConfirmDeleteDialog.tsx';
-
-// 导入模型图标
-import openaiIcon from '@/assets/providers/openai.png';
-import geminiIcon from '@/assets/providers/gemini.png';
-import qwenIcon from '@/assets/providers/qwenlm.png';
-import deepseekIcon from '@/assets/providers/deepseek.png';
-
-// 模型类型配置
-const modelTypeOptions = [
-  {
-    value: ModelType.QWEN,
-    title: '通义千问',
-    description: '阿里巴巴',
-    icon: qwenIcon,
-  },
-  {
-    value: ModelType.DEEPSEEK,
-    title: 'DeepSeek',
-    description: '深度求索',
-    icon: deepseekIcon,
-  },
-  {
-    value: ModelType.GEMINI,
-    title: 'Gemini',
-    description: 'Google',
-    icon: geminiIcon,
-  },
-  {
-    value: ModelType.OPENAI,
-    title: 'OpenAI',
-    description: 'OpenAI',
-    icon: openaiIcon,
-  },
-  {
-    value: ModelType.OPENAI_COMPATIBLE,
-    title: 'OpenAI兼容',
-    description: '兼容OpenAI规范的API',
-    icon: openaiIcon,
-  },
-];
+import { modelTypeOptions } from '@/services/models/providers';
 
 export function ModelManagement() {
   const { models, deleteModel } = useModelStore();
