@@ -6,7 +6,7 @@ import { StreamCallbacks } from '@/types/model';
  * 如果没有找到完整的标签对，则根据部分标签规则过滤内容，并设置 closed 为 false。
  *
  * @param text 要过滤的文本字符串。
- * @param tag 要查找的 HTML 标签名称 (例如 "summary", "div")。
+ * @param tag 要查找的标签名称 (例如 "summary", "div")。大小写不敏感。
  * @returns 一个包含 closed (布尔值), content (过滤后的字符串), 和 hasPartialOpenTag (布尔值) 的对象。
  *          hasPartialOpenTag 为 true 表示匹配到了部分或全部开始标签，该标签影响了最终返回的内容。
  */
@@ -19,14 +19,14 @@ export function filterContentByTag(
     return { closed: false, content: '', hasPartialOpenTag: false };
   }
 
-  const openTag = `<${tag}>`;
-  const closeTag = `</${tag}>`;
+  const openTag = `<${tag.toLowerCase()}>`;
+  const closeTag = `</${tag.toLowerCase()}>`;
 
   // 1. 检查是否存在完整的标签对
   //    我们寻找最后一个开标签，以及它之后最近的闭合标签，以处理嵌套或多个同名标签的情况。
-  const lastOpenTagIndex = text.lastIndexOf(openTag);
+  const lastOpenTagIndex = text.toLowerCase().lastIndexOf(openTag);
   if (lastOpenTagIndex !== -1) {
-    const firstCloseTagIndexAfterLastOpen = text.indexOf(
+    const firstCloseTagIndexAfterLastOpen = text.toLowerCase().indexOf(
       closeTag,
       lastOpenTagIndex + openTag.length
     );
@@ -50,7 +50,7 @@ export function filterContentByTag(
   // 这个操作本身不意味着我们找到了一个“部分开始标签”，所以不在这里设置 determinedHasPartialOpenTag
   for (let i = closeTag.length; i >= 1; i--) {
     const partialEndTag = closeTag.substring(0, i);
-    if (currentContent.endsWith(partialEndTag)) {
+    if (currentContent.toLowerCase().endsWith(partialEndTag)) {
       currentContent = currentContent.substring(0, currentContent.length - partialEndTag.length);
       break; // 只删除最长的匹配部分
     }
@@ -58,7 +58,7 @@ export function filterContentByTag(
 
   // 检查是否存在完整的开标签（在处理完部分闭合标签之后的内容中）
   // 这个开标签没有对应的闭合标签（否则会在步骤1中处理掉）
-  const lastCompleteOpenTagIndexInCurrent = currentContent.lastIndexOf(openTag);
+  const lastCompleteOpenTagIndexInCurrent = currentContent.toLowerCase().lastIndexOf(openTag);
   if (lastCompleteOpenTagIndexInCurrent !== -1) {
     // 找到了一个完整的开标签，但没有闭合它。内容是这个开标签之后的部分。
     determinedHasPartialOpenTag = true;
@@ -71,7 +71,7 @@ export function filterContentByTag(
     // 没有找到完整的开标签，现在检查是否存在部分开标签在字符串末尾
     for (let i = openTag.length - 1; i >= 1; i--) {
       const partialOpenTag = openTag.substring(0, i);
-      if (currentContent.endsWith(partialOpenTag)) {
+      if (currentContent.toLowerCase().endsWith(partialOpenTag)) {
         // 找到了部分开标签，内容是该部分之前的内容
         determinedHasPartialOpenTag = true;
         return {
