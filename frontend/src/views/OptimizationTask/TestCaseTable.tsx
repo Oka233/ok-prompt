@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import {
   Box,
   Badge,
@@ -6,11 +7,10 @@ import {
   Table,
   Popover,
   Portal,
-  IconButton,
-  Clipboard,
-  Spacer,
+  Separator,
 } from '@chakra-ui/react';
-import { useCurrentTestCases } from '@/store/useOptimizationStore.ts';
+import { useCurrentTestCases } from '@/store/useOptimizationStore';
+import { TestCaseResult } from '@/types/optimization';
 
 export function TestCaseTable() {
   const currentTestCases = useCurrentTestCases();
@@ -68,7 +68,7 @@ export function TestCaseTable() {
 
     for (let i = 0; i < maxIterationCount; i++) {
       const label = i === 0 ? '初始提示词结果' : `迭代 ${i} 结果`;
-      iterationHeaders.push(
+      iterationHeaders.unshift(
         <Table.ColumnHeader key={`iteration-${i}`} w="150px">
           {label}
         </Table.ColumnHeader>
@@ -85,7 +85,7 @@ export function TestCaseTable() {
   };
 
   // 渲染可点击查看完整内容的文本
-  const renderPopoverText = (content: string) => {
+  const renderPopoverText = (trigger: string, content: ReactNode) => {
     return (
       <Popover.Root size="xs">
         <Popover.Trigger asChild>
@@ -94,35 +94,18 @@ export function TestCaseTable() {
             overflow="hidden"
             textOverflow="ellipsis"
             whiteSpace="nowrap"
-            lineClamp="2"
+            lineClamp={2}
             cursor="pointer"
             _hover={{ textDecoration: 'underline' }}
           >
-            {content}
+            {trigger}
           </Text>
         </Popover.Trigger>
         <Portal>
           <Popover.Positioner>
             <Popover.Content maxH="40vh" maxW="40vw" width="initial">
               <Popover.Arrow />
-              <Popover.Header>
-                <Flex alignItems="center">
-                  <Text fontSize="sm" fontWeight="medium">
-                    内容详情
-                  </Text>
-                  <Spacer />
-                  <Clipboard.Root value={content} ml={2}>
-                    <Clipboard.Trigger asChild>
-                      <IconButton variant="ghost" size="xs" aria-label="复制内容">
-                        <Clipboard.Indicator />
-                      </IconButton>
-                    </Clipboard.Trigger>
-                  </Clipboard.Root>
-                </Flex>
-              </Popover.Header>
-              <Popover.Body overflowY="auto">
-                <Text whiteSpace="pre-wrap">{content}</Text>
-              </Popover.Body>
+              <Popover.Body overflowY="auto">{content}</Popover.Body>
             </Popover.Content>
           </Popover.Positioner>
         </Portal>
@@ -131,25 +114,43 @@ export function TestCaseTable() {
   };
 
   // 渲染测试用例的迭代结果
-  const renderIterationResults = (testCase: any) => {
+  const renderIterationResults = (testCase: TestCaseResult) => {
     const cells = [];
 
     // 遍历最大迭代次数，确保每行有相同数量的单元格
     for (let i = 0; i < maxIterationCount; i++) {
-      const result = testCase.iterationResults.find((r: any) => r.iteration === i);
+      const result = testCase.iterationResults.find(r => r.iteration === i);
 
       if (result) {
-        cells.push(
+        const popoverContent = (
+          <Box>
+            {result.comment && (
+              <>
+                <Box>
+                  <Text whiteSpace="pre-wrap">
+                    {result.comment}
+                  </Text>
+                </Box>
+                <Separator my={2} />
+              </>
+            )}
+            <Text whiteSpace="pre-wrap">
+              {result.output}
+            </Text>
+          </Box>
+        );
+
+        cells.unshift(
           <Table.Cell key={`result-${i}`}>
             <Flex alignItems="center">
               {result.score && <Box mr={2}>{renderScoreBadge(result.score)}</Box>}
-              {renderPopoverText(result.output)}
+              {renderPopoverText(result.output, popoverContent)}
             </Flex>
           </Table.Cell>
         );
       } else {
         // 如果该迭代没有结果，添加空单元格保持表格结构
-        cells.push(<Table.Cell key={`result-${i}`}></Table.Cell>);
+        cells.unshift(<Table.Cell key={`result-${i}`}></Table.Cell>);
       }
     }
 
@@ -163,14 +164,24 @@ export function TestCaseTable() {
           {renderTableHeader()}
         </Table.Header>
         <Table.Body>
-          {currentTestCases.map(testCase => (
+          {currentTestCases.map((testCase: TestCaseResult) => (
             <Table.Row key={testCase.id}>
               {renderIterationResults(testCase)}
               <Table.Cell>
-                <Flex alignItems="center">{renderPopoverText(testCase.input)}</Flex>
+                <Flex alignItems="center">
+                  {renderPopoverText(
+                    testCase.input,
+                    <Text whiteSpace="pre-wrap">{testCase.input}</Text>
+                  )}
+                </Flex>
               </Table.Cell>
               <Table.Cell>
-                <Flex alignItems="center">{renderPopoverText(testCase.expectedOutput)}</Flex>
+                <Flex alignItems="center">
+                  {renderPopoverText(
+                    testCase.expectedOutput,
+                    <Text whiteSpace="pre-wrap">{testCase.expectedOutput}</Text>
+                  )}
+                </Flex>
               </Table.Cell>
             </Table.Row>
           ))}

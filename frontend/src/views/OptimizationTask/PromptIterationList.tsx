@@ -10,6 +10,7 @@ import {
   IconButton,
   Spacer,
   Clipboard,
+  Separator,
 } from '@chakra-ui/react';
 import { useState } from 'react';
 import { BiChevronDown } from 'react-icons/bi';
@@ -152,6 +153,7 @@ export function PromptIterationList() {
               </Text>
               {getStageBadge(item)}
             </Flex>
+            <Separator mt={1} mb={2} />  
             <Text fontSize="sm" color="gray.600" mt={2} mb={2} whiteSpace="pre-wrap">
               {item.prompt}
             </Text>
