@@ -447,7 +447,7 @@ export function ModelFormDialog({
                         <Checkbox.Label>启用推理</Checkbox.Label>
                       </Checkbox.Root>
                       <Field.HelperText fontSize="xs" color="gray.500">
-                        为混合模型启用流式输出时的推理
+                        为混合模型启用推理
                       </Field.HelperText>
                     </Field.Root>
                   )}

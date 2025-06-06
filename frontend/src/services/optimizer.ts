@@ -187,7 +187,7 @@ export async function evaluateResults({
       model.enableReasoning
     );
 
-    const response = await model.generateCompletion(messages);
+    const response = await model.generateCompletion(messages, undefined, false);
     const { score, reasoning } = parseEvaluationResponse(response.answer);
 
     return {

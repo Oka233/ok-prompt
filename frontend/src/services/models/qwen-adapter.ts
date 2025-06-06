@@ -1,6 +1,7 @@
 import { ModelResponse, ModelMessage, ModelOptions, StreamCallbacks } from '@/types/model';
 import { OpenAIAdapter } from './openai-adapter';
 import { ModelReasoningType } from '@/types/optimization';
+import { adaptQwen3ThinkingPrompt } from '@/utils/promptUtils';
 
 export class QwenAdapter extends OpenAIAdapter {
   constructor(
@@ -13,7 +14,7 @@ export class QwenAdapter extends OpenAIAdapter {
     super(apiKey, modelName, baseUrl, modelReasoningType, enableReasoning);
   }
 
-  getReasoningParameter(enableReasoning: boolean): object {
+  getReasoningParameter(enableReasoning: boolean): { enable_thinking?: boolean } {
     if (
       [ModelReasoningType.NON_REASONING, ModelReasoningType.REASONING].includes(
         this.modelReasoningType
@@ -28,12 +29,13 @@ export class QwenAdapter extends OpenAIAdapter {
 
   async generateCompletion(
     messages: ModelMessage[],
-    options?: ModelOptions
+    options?: ModelOptions,
+    reasoningSwitch?: boolean
   ): Promise<ModelResponse> {
-    options = {
-      ...options,
-      ...this.getReasoningParameter(false),
-    };
+    // 非流式不支持 enable_thinking 参数
+    if (this.getReasoningParameter(reasoningSwitch ?? this.enableReasoning)?.enable_thinking) {
+      messages = adaptQwen3ThinkingPrompt(messages, reasoningSwitch ?? this.enableReasoning);
+    }
     const response = await super.generateCompletion(messages, options);
     return response;
   }

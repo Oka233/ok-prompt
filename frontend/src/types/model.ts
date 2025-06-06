@@ -35,7 +35,11 @@ export interface ModelProvider {
   modelReasoningType: ModelReasoningType;
   enableReasoning: boolean;
   // 非流式调用
-  generateCompletion(messages: ModelMessage[], options?: ModelOptions): Promise<ModelResponse>;
+  generateCompletion(
+    messages: ModelMessage[],
+    options?: ModelOptions,
+    reasoningSwitch?: boolean
+  ): Promise<ModelResponse>;
 
   // 流式调用
   generateCompletionStream(

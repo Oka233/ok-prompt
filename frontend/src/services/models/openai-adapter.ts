@@ -61,7 +61,8 @@ export class OpenAIAdapter implements ModelProvider {
    */
   async generateCompletion(
     messages: ModelMessage[],
-    options?: ModelOptions
+    options?: ModelOptions,
+    reasoningSwitch?: boolean
   ): Promise<ModelResponse> {
     try {
       // 适配参数格式

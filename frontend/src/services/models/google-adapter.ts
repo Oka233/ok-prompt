@@ -43,6 +43,11 @@ export class GoogleAdapter implements ModelProvider {
       para.thinkingConfig.thinkingBudget = 0;
     }
 
+    // gemini 2.5 pro 0605 支持 thinkingBudget 参数
+    if (this.modelReasoningType === ModelReasoningType.REASONING && !enableReasoning) {
+      para.thinkingConfig.thinkingBudget = 128;
+    }
+
     return para;
   }
 
@@ -89,7 +94,8 @@ export class GoogleAdapter implements ModelProvider {
    */
   async generateCompletion(
     messages: ModelMessage[],
-    options?: ModelOptions
+    options?: ModelOptions,
+    reasoningSwitch?: boolean
   ): Promise<ModelResponse> {
     try {
       const { geminiContents, systemInstruction } = this.convertMessages(messages);
@@ -103,7 +109,7 @@ export class GoogleAdapter implements ModelProvider {
         contents: geminiContents,
         config: {
           systemInstruction,
-          ...this.getReasoningParameter(false),
+          ...this.getReasoningParameter(reasoningSwitch ?? this.enableReasoning),
           ...adaptedOptions,
         },
       });

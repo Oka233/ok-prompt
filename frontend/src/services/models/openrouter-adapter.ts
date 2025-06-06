@@ -1,24 +1,7 @@
 import { ModelResponse, ModelMessage, ModelOptions, StreamCallbacks } from '@/types/model';
 import { OpenAIAdapter } from './openai-adapter';
 import { ModelReasoningType } from '@/types/optimization';
-
-// openrouter 不支持 enable_thinking 参数，使用软开关
-const adaptQwen3ThinkingPrompt = (
-  messages: ModelMessage[],
-  enableThinking: boolean
-): ModelMessage[] => {
-  if (messages.length === 0) return messages; // 处理空数组情况
-  const softSwitch = enableThinking ? '/think' : '/no_think';
-  const lastMessage = messages[messages.length - 1];
-  // 创建新数组并修改最后一个元素
-  return [
-    ...messages.slice(0, -1),
-    {
-      ...lastMessage,
-      content: `${lastMessage.content}${softSwitch}`,
-    },
-  ];
-};
+import { adaptQwen3ThinkingPrompt } from '@/utils/promptUtils';
 
 export class OpenRouterAdapter extends OpenAIAdapter {
   constructor(
@@ -33,10 +16,11 @@ export class OpenRouterAdapter extends OpenAIAdapter {
 
   async generateCompletion(
     messages: ModelMessage[],
-    options?: ModelOptions
+    options?: ModelOptions,
+    reasoningSwitch?: boolean
   ): Promise<ModelResponse> {
     if (this.modelName.includes('qwen3')) {
-      messages = adaptQwen3ThinkingPrompt(messages, false); // 非流式调用不启用推理
+      messages = adaptQwen3ThinkingPrompt(messages, reasoningSwitch ?? this.enableReasoning);
     }
     const response = await super.generateCompletion(messages, options);
     return response;
